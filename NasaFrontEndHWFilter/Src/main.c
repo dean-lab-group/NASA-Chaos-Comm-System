@@ -52,7 +52,7 @@ UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-static int TestArray[48]; //= {1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0};
+static int TestArray[48] = {1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0};
 	//To prevent transients on the oscillator, multiple copies of the same symbol must be sent in a row.
 	//This sequency is actually 1010110010
 int ArrLen = sizeof(TestArray) / sizeof(int);
@@ -60,7 +60,7 @@ int ArrInd = 0;
 int NextSymbol = 85, CurrentSymbol = 85;
 	//85 = invalid input, prevents accidentaly entering loops
 
-int togglecheck = 1; // flag for when to update nextt transmitted symbol
+volatile int togglecheck = 1; // flag for when to update nextt transmitted symbol
 char PolarityCheck = 'R'; //used to update current edge polarity (Rise or fall)
 int stop_ADC = 1; 
 int CaseNumber = 0; //used to (eventually) switch between data entry modes
@@ -588,8 +588,7 @@ void ReadCustomData(void){
 	
 	p = sprintf((char *)buffer, "Please enter in your own input:\n");
 	HAL_UART_Transmit(&huart2, buffer, p,50);
-	while(HAL_UART_Receive(&huart2, recbuff, 1, 10) != HAL_OK){
-	}
+	HAL_UART_Receive(&huart2, recbuff, 1, 10000);
 	p = 0;
 	for(i=0;i<8;i++){
 		sendbuff[i] = (recbuff[0] & (0x1 << i));
@@ -604,26 +603,29 @@ void ReadCustomData(void){
 				HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
 				togglecheck = 0;
 			}
+	HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);
 				
 	for(i=0;i<8;i++){
 		int j = 0;
 
 		if(sendbuff[i] == 1){
 			for(j=0;j<12;j++){
-				while(!togglecheck){
+				while(togglecheck == 0){
 				}
 				HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);	
 				HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
 				togglecheck = 0;
 			}
+				HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);	
 		}else if(sendbuff[i] == 0){
-			for(j=0;j<6;j++){
-				while(!togglecheck){
+			for(j=0;j<12;j++){
+				while(togglecheck == 0){
 				}
 				HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);
 				HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 				togglecheck = 0;
 			}
+			HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);	
 		}
 	}
 	
@@ -685,10 +687,8 @@ void HAL_TIM_IC_CaptureCallback( TIM_HandleTypeDef* htim ){
 		}
 		if(PolarityCheck == 'R'){ //change IC capture polarity
 			__HAL_TIM_SET_CAPTUREPOLARITY(&htim3, TIM_CHANNEL_1, TIM_INPUTCHANNELPOLARITY_RISING);
-			HAL_GPIO_WritePin( TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);
 		}else if(PolarityCheck == 'F'){
 			__HAL_TIM_SET_CAPTUREPOLARITY(&htim3, TIM_CHANNEL_1, TIM_INPUTCHANNELPOLARITY_FALLING);
-			HAL_GPIO_WritePin( TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET); 
 		}
 	}
 }
@@ -710,12 +710,13 @@ void HAL_TIM_OC_DelayElapsedCallback( TIM_HandleTypeDef* htim ){
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	
 	
-	if((htim4.Instance->CR1 && 0x0001) == 0){
-		HAL_TIM_OC_Start_IT(&htim4, TIM_CHANNEL_1);
-	}else if((htim4.Instance->CR1 && 0x0001) == 1){
-		EntryModeFlag = 1;
-	}
+//	if((htim4.Instance->CR1 && 0x0001) == 0){
+//		HAL_TIM_OC_Start_IT(&htim4, TIM_CHANNEL_1);
+//	}else if((htim4.Instance->CR1 && 0x0001) == 1){
+//		EntryModeFlag = 1;
+//	}
 	StartFlag = 1;
+	CaseNumber++;
 //	if(!CaseNumber){
 //		HAL_TIM_IC_Stop_IT(&htim3, TIM_CHANNEL_1);
 //		CaseNumber++;
