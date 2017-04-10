@@ -1,3 +1,0 @@
-achieved continuous adc conver
-next is to do timer controlled
-also why is adc outputting 1.03 V?
