@@ -397,6 +397,11 @@
               <FileType>1</FileType>
               <FilePath>..\Src\ManchesterEncode.c</FilePath>
             </File>
+            <File>
+              <FileName>MX_INIT_FUNC.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\MX_INIT_FUNC.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
