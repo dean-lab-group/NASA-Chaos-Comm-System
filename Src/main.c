@@ -32,6 +32,7 @@
   */
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_hal.h"
+#include "ManchesterEncode.h"
 
 /* USER CODE BEGIN Includes */
 #define OFFSET 30
@@ -81,13 +82,6 @@ volatile uint32_t EntryModeFlag = 0;
 volatile uint32_t StartFlag = 0;
 
 
-
- /*
- CaseNumber:
-		0 = TestCase
-		1 = Programmable Case
-		2 = User Input
- */
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -606,26 +600,10 @@ void ReadCustomData(void){
 	HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);
 				
 	for(i=0;i<8;i++){
-		int j = 0;
-
 		if(sendbuff[i] == 1){
-			for(j=0;j<12;j++){
-				while(togglecheck == 0){
-				}
-				HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);	
-				HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-				togglecheck = 0;
-			}
-				HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);	
+			ManchesterOne();
 		}else if(sendbuff[i] == 0){
-			for(j=0;j<12;j++){
-				while(togglecheck == 0){
-				}
-				HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);
-				HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-				togglecheck = 0;
-			}
-			HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);	
+			ManchesterZero();			
 		}
 	}
 	
