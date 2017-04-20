@@ -60,9 +60,8 @@ uint32_t FallTimestamp = 0;
 uint32_t RiseTimestamp = 0;
 uint32_t TimeDiff = 0;
 
-uint8_t  EdgeFlag = 'X';
+uint8_t  EdgeFlag = 0;
 uint32_t ZeroFlag = 0;
-uint32_t LowCompleteFlag = 0;
 uint32_t ReceiveFlag = 0;
 uint32_t AlreadyProcessedFlag = 0;
 uint32_t EdgeDetectFlag = 0;
@@ -84,6 +83,8 @@ uint32_t SymbolReceived = 86;
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
 void OutputSymbol(void);
+uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag);
+uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t* symbol);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -131,6 +132,7 @@ int main(void)
 
   /* USER CODE BEGIN 3 */
 		while(ReceiveFlag){
+			ReceiveFlag = 0;
 			OutputSymbol();
 		}
   }
@@ -139,67 +141,74 @@ int main(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/*  OutputSymbol
+ *  This function toggles an output pin to indicate whether a
+ *  1 or 0 has been received.
+ *  It also writes 1 or 0 to the UART (seen through USB COM Port
+ */
 void OutputSymbol (void){
 	//This function is used to actually indicate what symbol has been detected/
 	// decoded, by writing an output pin to the corresponding state as well as
 	// writing the value over UART
 	
-	ReceiveFlag = 0; //clear ReceiveFlag
-	
-	if(ZeroFlag && !AlreadyProcessedFlag){
-		//This is if a zero was detected, but not processed yet
-		
-		//create string with the symbol decoded, and send over UART
-		if(!CustomDataMode){
-			n = sprintf(buffer, "%d\n\r", 0);
-			HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
-		}else if(CustomDataMode != 0){
-			CustomData = (0 << CustomIndex);
-		}
-		
-		//Write output pin low
-		HAL_GPIO_WritePin(FilteredOutput_GPIO_Port, FilteredOutput_Pin, GPIO_PIN_RESET);
-		
-		//show zero has been processed, and clear the zero flag
-		AlreadyProcessedFlag = 1;
-		ZeroFlag = 0;
-		
+	if(ZeroFlag && !AlreadyProcessedFlag){	//This is if a zero was detected, but not processed yet
+		n = sprintf(buffer, "%d\n\r", 0);
+		HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
+		HAL_GPIO_WritePin(FilteredOutput_GPIO_Port, FilteredOutput_Pin, GPIO_PIN_RESET);	
+		AlreadyProcessedFlag = 1; //show zero has been processed, and clear the zero flag
+		ZeroFlag = 0;	
 	}else if(!ZeroFlag){ //if no zero was detected by the timer
-		switch(SymbolReceived){ //switch to proper symbol
-//			case(0):
-//				//create string with the symbol decoded, and send over UART
-//				n = sprintf(buffer, "%d\n\r", SymbolReceived);
-//				HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
-//				
-//				//write output pin low
-//				HAL_GPIO_WritePin(FilteredOutput_GPIO_Port, FilteredOutput_Pin, GPIO_PIN_RESET);
-//				break;
-			case(1):
-				//create string with the symbol decoded, and send over UART
-				if(!CustomDataMode){
-					n = sprintf(buffer, "%d\n\r", SymbolReceived);
-					HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
-				}else if(CustomDataMode != 0){
-					CustomData = (SymbolReceived << CustomIndex);
-				}
-				
-				//write output pin high
-				HAL_GPIO_WritePin(FilteredOutput_GPIO_Port, FilteredOutput_Pin, GPIO_PIN_SET);
-			break;
-		}
-			
-	}
-	if(CustomIndex>=8){
-	
-		n = sprintf(buffer, "%d\n\r", CustomData);
-		CustomData = 0;
-		CustomIndex = 0;
-		HAL_ADC_Stop_DMA(&hadc1);		
-		MX_ADC1_Init();
-		SymbolRecep = 0;
-		HAL_ADC_Start_DMA(&hadc1, ADCConvArr, 1);
+		n = sprintf(buffer, "%d\n\r", 1);
+		HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
+		HAL_GPIO_WritePin(FilteredOutput_GPIO_Port, FilteredOutput_Pin, GPIO_PIN_SET);	
 	}
 }
+
+/* EdgeDetect
+ * Looks at 2 sequential values to determine whether a valid 
+ * edge transistion has occured.
+ *
+ * Outputs R or F to show whether edge was fall or rise,
+ * and sets a 1 using a pointer to a flag.
+ */
+uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag){
+	uint8_t edge = 0;
+	
+	if((past_val <= LOWEDGE) && (curr_val >= HIGHEDGE)){
+		edge = 'R'; //Rising edge
+		*flag = 1; //edge has been detected
+	}else if((past_val >= HIGHEDGE) && (curr_val <= LOWEDGE)){
+		edge = 'F'; //falling edge
+		*flag = 1; //edge has been detected
+	}
+	
+	return edge;
+}
+
+/* PulseSymbolValidation
+ * Calculates a pulse length, then determines whether the length was
+ * within a valid threshold to be a valid transmission.
+ *
+ * Returns a flag to indicate a symbol was recieved, and writes a 1 
+ * (only valid symbol pulses dnote) to an address.
+ */
+uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t* symbol){
+	uint32_t difference = 0;
+	uint32_t flag = 0;
+	
+	if(rise_time > fall_time){ //difference calculation
+		difference = rise_time - fall_time;
+	}else if(rise_time < fall_time){
+		difference = ((0xFFFF - fall_time) + rise_time);
+	}
+	if(difference <= ZEROPULSE){ //determining symbol
+		*symbol = 1;
+		flag = 1;
+		}				///take RiseTime, FallTIme, symboladdr,::::return receiveflag
+	return flag;
+}
+
 void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 			
 	// This callback is called every time the ADC finishes a conversion
@@ -207,83 +216,38 @@ void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 
 	//Save the previously converted value and pull the current converted value
 	PastConvertedValue = CurrentConvertedValue;
-	CurrentConvertedValue =ADCConvArr[0];
+	CurrentConvertedValue = ADCConvArr[0];
+	EdgeFlag = EdgeDetect(PastConvertedValue, CurrentConvertedValue, &EdgeDetectFlag);
 	
-	//LOWEDGE and HIGHEDGE are constants that are used to differentiate signal noise
-	// from valid voltage level transitions. (i.e., a large swing from 0V - 3.3V vs .01V - .015V)
-	if((PastConvertedValue <= LOWEDGE) && (CurrentConvertedValue >= HIGHEDGE)){
-		EdgeFlag = 'R'; //Rising edge
-		RiseTimestamp = __HAL_TIM_GetCounter(&htim3); // pull the current counter value
-		if(EdgeFlag != 'X'){
-			LowCompleteFlag = 1; //if not the first edge detected, shows that a low period is over
-		}
-		EdgeDetectFlag = 1; //edge has been detected
-	} else if((PastConvertedValue >= HIGHEDGE) && (CurrentConvertedValue <= LOWEDGE)){
-		EdgeFlag = 'F'; //falling edge
-		FallTimestamp = __HAL_TIM_GET_COUNTER(&htim3); //get time stamp
-		EdgeDetectFlag = 1; //edge has been detected
+	switch(EdgeFlag){
+		case 0:
+			break;
+		case 'F':
+				RiseTimestamp = __HAL_TIM_GetCounter(&htim3); // pull the current counter value
+			break;
+		case 'R':
+				FallTimestamp = __HAL_TIM_GET_COUNTER(&htim3); //get time stamp
+			break;
 	}
 	
-	if(CustomDataMode != 0){
-		if(EdgeDetectFlag == 1){
-			SymbolReceived = 1;
-			ReceiveFlag = 1;
-		}else if(ZeroFlag == 1){
-			SymbolReceived = 0;
-			ReceiveFlag = 1;
-		}
-	}
-
-	
-	if((EdgeFlag != 'X') && (CustomDataMode == 0)){ //if an edge *has* been detected
-		
-		
-		if(ZeroFlag){ //and if a zero has been decoded
-			SymbolReceived = 0; //symbol is a zero
-			ReceiveFlag = 1; //symbol has been received
-		}
-			
+	if(EdgeFlag != 0){ 
+		if(ZeroFlag){ 
+			SymbolReceived = 0; 
+			ReceiveFlag = 1; 
+		}	
 		if(EdgeFlag == 'F' && EdgeDetectFlag && !ZeroFlag){
-			//this section is to start the zero detection timer/logic
-
-			EdgeDetectFlag = 0; //clear flag
-			
-			//set output-compare value, then start the OC timer
+			EdgeDetectFlag = 0; 
 			__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, __HAL_TIM_GET_COUNTER(&htim3) + ZEROPULSE);
 			HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
 			
-			
-		}else if(EdgeFlag == 'R' && EdgeDetectFlag && LowCompleteFlag && !AlreadyProcessedFlag){
-			//if a low pulse is complete, edge deteced, edge is rising, and not processed
-			
-			LowCompleteFlag = 0;// clear flag
-			if(!ZeroFlag  && !AlreadyProcessedFlag){  //if not zero or already processed
+		}else if(EdgeFlag == 'R' && EdgeDetectFlag && !AlreadyProcessedFlag){	
+			if(!ZeroFlag){
 				HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_1);
-				if(RiseTimestamp > FallTimestamp){ //timediff calculation
-					TimeDiff = RiseTimestamp - FallTimestamp;
-				}else if(RiseTimestamp < FallTimestamp){
-					TimeDiff = ((0xFFFF - FallTimestamp) + RiseTimestamp);
-				}
-				
-				if(TimeDiff <= ZEROPULSE){ //determining symbol
-					SymbolReceived = 1;
-					ReceiveFlag = 1;
-				}				
-//					else{
-//					SymbolReceived = 0;
-//					ReceiveFlag = 1;
-//				}
+				ReceiveFlag = PulseSymbolValidation(RiseTimestamp, FallTimestamp, &SymbolReceived);
 			}
-		}else if(AlreadyProcessedFlag){ //clear flag
+		}else if(AlreadyProcessedFlag){
 			AlreadyProcessedFlag = 0;
 		}
-	}
-	
-	if((CustomDataMode != 0) && (SymbolReceived == 1) && (SymbolRecep == 0)){
-		HAL_ADC_Stop_DMA(&hadc1);		
-		SymbolRecep = 1;
-		CustomIndex = 0;
-		HAL_TIM_OC_Start_IT(&htim5, TIM_CHANNEL_1);
 	}
 }
 
@@ -300,25 +264,11 @@ void HAL_TIM_OC_DelayElapsedCallback( TIM_HandleTypeDef* htim){
 	//which is decoded by starting a timer. When the length of the symbol has elapsed
 	// this callback flags a zero
 	if(htim == &htim2){
-		
-	}else if(htim == &htim3){
+		//htim2 is just for ADC sampling rate; do nothing
+	}else if(htim == &htim3){ //long enough pulse to be a zero
 		ZeroFlag = 1;	
 		HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_1);
 		HAL_TIM_Base_Start(&htim3);
-	}else if(htim == &htim4){
-		HAL_ADC_Start_DMA(&hadc1, ADCConvArr, 1);
-		HAL_TIM_OC_Stop_IT(&htim8, TIM_CHANNEL_1);
-		CustomIndex++;
-		if(CustomIndex >= 8){
-			HAL_TIM_OC_Stop_IT(htim, TIM_CHANNEL_1);
-		}
-	}else if(htim == &htim5){
-		HAL_ADC_Start_DMA(&hadc1, ADCConvArr, 1);
-		CustomIndex++;
-		HAL_TIM_OC_Start_IT(&htim4, TIM_CHANNEL_1);
-	}else if(htim == &htim8){
-		HAL_TIM_OC_Stop_IT(&htim8, TIM_CHANNEL_1);
-		ZeroFlag = 1;
 	}
 }
 /* USER CODE END 4 */
