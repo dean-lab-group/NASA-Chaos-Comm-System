@@ -85,6 +85,8 @@ uint32_t SymbolReceived = 86;
 void OutputSymbol(void);
 uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag);
 uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t* symbol);
+void ADCBasicMode(void);
+void ADCCustomData(void);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -182,7 +184,6 @@ uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag){
 		edge = 'F'; //falling edge
 		*flag = 1; //edge has been detected
 	}
-	
 	return edge;
 }
 
@@ -209,11 +210,11 @@ uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t*
 	return flag;
 }
 
-void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
-			
-	// This callback is called every time the ADC finishes a conversion
-	// It contains the edge detection & symbol decoding logic
-
+/* ADCBasicMode
+ * Contains edge detection and processing logic for
+ * "debug" mode.
+ */
+void ADCBasicMode(void){
 	//Save the previously converted value and pull the current converted value
 	PastConvertedValue = CurrentConvertedValue;
 	CurrentConvertedValue = ADCConvArr[0];
@@ -249,6 +250,25 @@ void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 			AlreadyProcessedFlag = 0;
 		}
 	}
+}
+
+void ADCCustomData(void){
+	
+}
+
+void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
+			
+	// This callback is called every time the ADC finishes a conversion
+	// It contains the edge detection & symbol decoding logic
+	switch (CustomDataMode){	
+		case 0:
+			ADCBasicMode();
+			break;
+		case 1:
+			ADCCustomData();
+			break;		
+	}
+	
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
