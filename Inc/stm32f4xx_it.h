@@ -4,7 +4,7 @@
   * @brief   This file contains the headers of the interrupt handlers.
   ******************************************************************************
   *
-  * COPYRIGHT(c) 2016 STMicroelectronics
+  * COPYRIGHT(c) 2017 STMicroelectronics
   *
   * Redistribution and use in source and binary forms, with or without modification,
   * are permitted provided that the following conditions are met:
@@ -45,13 +45,11 @@
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
 
+void SVC_Handler(void);
+void PendSV_Handler(void);
 void SysTick_Handler(void);
-void TIM2_IRQHandler(void);
-void TIM3_IRQHandler(void);
-void TIM4_IRQHandler(void);
-void USART2_IRQHandler(void);
-void TIM8_CC_IRQHandler(void);
-void TIM5_IRQHandler(void);
+void ADC_IRQHandler(void);
+void EXTI15_10_IRQHandler(void);
 void DMA2_Stream0_IRQHandler(void);
 
 #ifdef __cplusplus

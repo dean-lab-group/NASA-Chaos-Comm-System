@@ -4,7 +4,7 @@
   * Description        : This file contains the common defines of the application
   ******************************************************************************
   *
-  * COPYRIGHT(c) 2016 STMicroelectronics
+  * COPYRIGHT(c) 2017 STMicroelectronics
   *
   * Redistribution and use in source and binary forms, with or without modification,
   * are permitted provided that the following conditions are met:
@@ -43,21 +43,16 @@
 
 #define B1_Pin GPIO_PIN_13
 #define B1_GPIO_Port GPIOC
-#define FilterSample_Pin GPIO_PIN_0
-#define FilterSample_GPIO_Port GPIOA
-#define USART_TX_Pin GPIO_PIN_2
-#define USART_TX_GPIO_Port GPIOA
-#define USART_RX_Pin GPIO_PIN_3
-#define USART_RX_GPIO_Port GPIOA
+#define SampleInput_Pin GPIO_PIN_0
+#define SampleInput_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5
 #define LD2_GPIO_Port GPIOA
-#define FilteredOutput_Pin GPIO_PIN_8
-#define FilteredOutput_GPIO_Port GPIOA
+#define DecodedOutput_Pin GPIO_PIN_8
+#define DecodedOutput_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 #define LOWEDGE 500
 #define HIGHEDGE 2000
 #define ZEROPULSE 16800
-
 /* USER CODE END Private defines */
 
 /**
