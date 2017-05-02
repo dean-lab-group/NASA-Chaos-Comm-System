@@ -351,6 +351,13 @@ static void MX_GPIO_Init(void)
 
 void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 	ADCBasicMode();
+	if(IntegratorValue > 10){
+		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+	}else if(IntegratorValue < 4){
+		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+	}
 }
 
 void MX_TIM3_Init(void)
