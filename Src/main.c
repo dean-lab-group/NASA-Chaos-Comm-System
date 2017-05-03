@@ -77,6 +77,9 @@ volatile uint32_t CustomIndex;
 volatile uint32_t CustomModeEdgeFlag;
 
 uint32_t SymbolReceived;
+uint8_t* SequenceFlags;
+uint8_t* SequenceIndex;
+uint8_t StartFlag = 0;
 
 /* USER CODE END PV */
 
@@ -97,6 +100,7 @@ void MX_TIM3_Init(void);
 void ADCBasicMode(void);
 uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag);
 uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t* symbol);
+uint8_t StartSequenceCheck(uint32_t last_symbol, uint8_t* received_ptr, uint8_t* index);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -395,9 +399,11 @@ void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 	if(IntegratorValue > 2720){
 		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
 		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+		SymbolReceived = 1;
 	}else if(IntegratorValue < 1360){
 		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+		SymbolReceived = 0;
 	}
 }
 
@@ -539,6 +545,78 @@ void OutputSymbol (void){
 		HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
 		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port , DecodedOutput_Pin, GPIO_PIN_SET);	
 	}
+}
+
+/*
+ * StartSequenceCheck
+ *
+ * Takes: last_symbol = logic 1 0r 0 from decoded string
+ *				received_ptr = pointer to a variable where each bit indicates a the sequence of received values
+ * 				index = index indicating which bit in *received_ptr is being written to 
+ * 
+ * Returns: flag = indicates whether a start sequence has been decoded
+ *
+ *
+ * Description
+ * 			Looks for the binary pattern 1100 in the deocoded stream to indicate when a start has been indicated
+ * 			Uses index to check individual bits in a variable, and resets the index sequence if pattern doesn't
+ * 			match at any point.
+ *
+ * Example
+ *			StartFlag = StartSequenceCheck(SymbolReceived, SequenceFlags, SequenceIndex);
+ *
+ * Usage note
+ * 		Invoke this at data sampling frequency, not ADC frequency. 
+ *
+ */
+uint8_t StartSequenceCheck(uint32_t last_symbol, uint8_t* received_ptr, uint8_t* index){
+	uint8_t flag = 0;
+	
+	switch (*index) {
+		
+		case 0:
+			*received_ptr += last_symbol << (3 - *index);
+			*index += 1;
+			break;
+		
+		case 1:
+			if(*received_ptr & 0x8){
+				*received_ptr += last_symbol << (3 - *index);
+				*index += 1;
+			}else{
+				*received_ptr = 0;
+				*index = 0;
+			}
+			break;
+			
+		case 2:
+			if(*received_ptr & 0xc){
+				*received_ptr += last_symbol << (3 - *index);
+				*index += 1;
+			}else{
+				*received_ptr = 0;
+				*index = 0;
+			}
+			break;
+			
+		case 3:
+			if(*received_ptr & 0xc){
+				*received_ptr += last_symbol << (3 - *index);
+				*index += 1;
+			}else{
+				*received_ptr = 0;				
+				*index = 0;
+			}
+			break;		
+	}
+	
+	if((*received_ptr & 0xc) && (*index == 3)){
+		*index = 0;
+		*received_ptr = 0;
+		flag = 1;
+	}
+	
+	return flag;
 }
 
 /* USER CODE END 4 */
