@@ -41,6 +41,8 @@
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
+DAC_HandleTypeDef hdac;
+
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart2;
@@ -87,9 +89,11 @@ static void SystemClock_Config(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_DAC_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
+void MX_TIM3_Init(void);
 void ADCBasicMode(void);
 uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag);
 uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t* symbol);
@@ -117,12 +121,14 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  SystemClock_Config();
+  //SystemClock_Config();
   MX_ADC1_Init();
   MX_TIM2_Init();
   MX_USART2_UART_Init();
+  MX_DAC_Init();
 
   /* USER CODE BEGIN 2 */
+	MX_TIM3_Init();
 	HAL_ADC_Start_DMA(&hadc1, ADCValue, sizeof(uint16_t)); 
 	HAL_TIM_Base_Start_IT(&htim2);
   /* USER CODE END 2 */
@@ -228,6 +234,31 @@ static void MX_ADC1_Init(void)
 
 }
 
+/* DAC init function */
+static void MX_DAC_Init(void)
+{
+
+  DAC_ChannelConfTypeDef sConfig;
+
+    /**DAC Initialization 
+    */
+  hdac.Instance = DAC;
+  if (HAL_DAC_Init(&hdac) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+    /**DAC channel OUT1 config 
+    */
+  sConfig.DAC_Trigger = DAC_TRIGGER_NONE;
+  sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
+  if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+}
+
 /* TIM2 init function */
 static void MX_TIM2_Init(void)
 {
@@ -324,6 +355,7 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -338,8 +370,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : TimerOut_Pin */
+  GPIO_InitStruct.Pin = TimerOut_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(TimerOut_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, LD2_Pin|DecodedOutput_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(TimerOut_GPIO_Port, TimerOut_Pin, GPIO_PIN_RESET);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
@@ -348,13 +390,12 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
 void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 	ADCBasicMode();
-	if(IntegratorValue > 10){
+	if(IntegratorValue > 2720){
 		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
 		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-	}else if(IntegratorValue < 4){
+	}else if(IntegratorValue < 1360){
 		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 	}
@@ -416,19 +457,23 @@ void ADCBasicMode(void){
 	CurrentConvertedValue = *ADCValue;
 	EdgeFlag = EdgeDetect(PastConvertedValue, CurrentConvertedValue, &EdgeDetectFlag);
 	
-	switch(EdgeFlag){
-		case 0:
-			break;
-		case 'F':
-			if(IntegratorValue > 0){
-				IntegratorValue--;
-			}
-			break;
-		case 'R':
-			if(IntegratorValue < 6){
-				IntegratorValue += 2;
-			}
-			break;
+	if(EdgeDetectFlag){
+		EdgeDetectFlag = 0;
+		switch(EdgeFlag){
+			case 0:
+				break;
+			case 'F':
+				if(IntegratorValue >= 340){
+					IntegratorValue -= 340;
+				}
+				break;
+			case 'R':
+				if(IntegratorValue <= 3415){
+					IntegratorValue += 680;
+				}
+				break;
+		}
+		DAC->DHR12R1 = IntegratorValue;
 	}
 	
 }

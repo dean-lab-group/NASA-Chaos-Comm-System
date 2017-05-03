@@ -45,10 +45,14 @@
 #define B1_GPIO_Port GPIOC
 #define SampleInput_Pin GPIO_PIN_0
 #define SampleInput_GPIO_Port GPIOA
+#define IntegratorSignal_Pin GPIO_PIN_4
+#define IntegratorSignal_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5
 #define LD2_GPIO_Port GPIOA
 #define DecodedOutput_Pin GPIO_PIN_8
 #define DecodedOutput_GPIO_Port GPIOA
+#define TimerOut_Pin GPIO_PIN_8
+#define TimerOut_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 #define LOWEDGE 500
 #define HIGHEDGE 2000
