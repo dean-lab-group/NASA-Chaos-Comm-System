@@ -473,7 +473,7 @@ void ADCBasicMode(void){
 				}
 				break;
 		}
-		DAC->DHR12R1 = IntegratorValue;
+		HAL_DAC_SetValue(&hdac, DAC1_CHANNEL_1, DAC_ALIGN_12B_R, IntegratorValue); 
 	}
 	
 }
