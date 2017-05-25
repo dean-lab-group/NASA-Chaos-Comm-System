@@ -1,7 +1,7 @@
 #include "stm32f4xx_hal.h"
 
 extern uint32_t IntegratorValue;
-extern uint32_t* ADCValue;
+extern uint32_t ADCValue[1];
 
 extern uint32_t CurrentConvertedValue;
 extern uint32_t PastConvertedValue;
