@@ -56,7 +56,7 @@
 /* USER CODE BEGIN Private defines */
 #define LOWEDGE 500
 #define HIGHEDGE 2000
-#define ZEROPULSE 16800
+#define ZEROPULSE 447
 /* USER CODE END Private defines */
 
 /**

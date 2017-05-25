@@ -135,6 +135,7 @@ int main(void)
 	MX_TIM3_Init();
 	HAL_ADC_Start_DMA(&hadc1, ADCValue, sizeof(uint16_t)); 
 	HAL_TIM_Base_Start_IT(&htim2);
+	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -461,19 +462,18 @@ void ADCBasicMode(void){
 	//Save the previously converted value and pull the current converted value
 	PastConvertedValue = CurrentConvertedValue;
 	CurrentConvertedValue = *ADCValue;
-	EdgeFlag = EdgeDetect(PastConvertedValue, CurrentConvertedValue, &EdgeDetectFlag);
-	
+	EdgeFlag = EdgeDetect(PastConvertedValue, CurrentConvertedValue, &EdgeDetectFlag);	
 	if(EdgeDetectFlag){
 		EdgeDetectFlag = 0;
 		switch(EdgeFlag){
-			case 0:
+			case 2:
 				break;
-			case 'F':
+			case 1:
 				if(IntegratorValue >= 340){
 					IntegratorValue -= 340;
 				}
 				break;
-			case 'R':
+			case 0:
 				if(IntegratorValue <= 3415){
 					IntegratorValue += 680;
 				}
@@ -493,15 +493,20 @@ void ADCBasicMode(void){
  */
 uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag){
 	uint8_t edge = 0;
+	uint8_t flag_temp = 2;
+	
 	
 	if((past_val <= LOWEDGE) && (curr_val >= HIGHEDGE)){
 		edge = 'R'; //Rising edge
+		RiseTimestamp = __HAL_TIM_GetCounter(&htim2);
 		*flag = 1; //edge has been detected
 	}else if((past_val >= HIGHEDGE) && (curr_val <= LOWEDGE)){
+		FallTimestamp = __HAL_TIM_GetCounter(&htim2);
+		flag_temp = PulseSymbolValidation(RiseTimestamp, FallTimestamp, &SymbolRecep); 
 		edge = 'F'; //falling edge
 		*flag = 1; //edge has been detected
 	}
-	return edge;
+	return flag_temp;
 }
 
 /* PulseSymbolValidation
@@ -509,18 +514,18 @@ uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag){
  * within a valid threshold to be a valid transmission.
  *
  * Returns a flag to indicate a symbol was recieved, and writes a 1 
- * (only valid symbol pulses dnote) to an address.
+ * (only valid symbol pulses denote) to an address.
  */
 uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t* symbol){
 	uint32_t difference = 0;
 	uint32_t flag = 0;
 	
-	if(rise_time > fall_time){ //difference calculation
-		difference = rise_time - fall_time;
-	}else if(rise_time < fall_time){
-		difference = ((0xFFFF - fall_time) + rise_time);
+	if(rise_time < fall_time){ //difference calculation
+		difference = fall_time -  rise_time;
+	}else if(rise_time > fall_time){
+		difference = ((0xFFFF - rise_time) + fall_time);
 	}
-	if(difference <= ZEROPULSE){ //determining symbol
+	if(difference >= ZEROPULSE){ //determining symbol
 		*symbol = 1;
 		flag = 1;
 		}				///take RiseTime, FallTIme, symboladdr,::::return receiveflag

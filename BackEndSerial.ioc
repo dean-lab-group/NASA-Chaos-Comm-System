@@ -126,10 +126,17 @@ ProjectManager.ProjectName=BackEndSerial
 ProjectManager.StackSize=0x400
 ProjectManager.TargetToolchain=MDK-ARM V5
 <<<<<<< HEAD
+<<<<<<< HEAD
 ProjectManager.ToolChainLocation=C\:\\Users\\andre\\Documents\\Programming\\BackEndDecoder
 =======
 ProjectManager.ToolChainLocation=
 >>>>>>> 81bef2ee8ba95ded0bbb85ecfa3ede5443ce58d4
+=======
+ProjectManager.ToolChainLocation=
+=======
+ProjectManager.ToolChainLocation=C\:\\Users\\andre\\Documents\\Programming\\BackEndDecoder
+>>>>>>> 20d15f07f2ad9651630912d946d5241182aa201b
+>>>>>>> d64b35f1535350c71acd40e37c53cde7f3fd916b
 ProjectManager.UnderRoot=false
 ProjectManager.functionlistsort=1-MX_GPIO_Init-GPIO-false-HAL,2-MX_DMA_Init-DMA-false-HAL,3-SystemClock_Config-RCC-false-HAL,4-MX_ADC1_Init-ADC1-false-HAL,5-MX_TIM2_Init-TIM2-false-HAL,6-MX_USART2_UART_Init-USART2-false-HAL,7-MX_DAC_Init-DAC-false-HAL
 RCC.AHBFreq_Value=180000000
