@@ -77,6 +77,9 @@ volatile uint32_t CustomIndex;
 volatile uint32_t CustomModeEdgeFlag;
 
 uint32_t SymbolReceived;
+uint8_t* SequenceFlags;
+uint8_t* SequenceIndex;
+uint8_t StartFlag = 0;
 
 /* USER CODE END PV */
 
@@ -97,6 +100,7 @@ void MX_TIM3_Init(void);
 void ADCBasicMode(void);
 uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag);
 uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t* symbol);
+uint8_t StartSequenceCheck(uint32_t last_symbol, uint8_t* received_ptr, uint8_t* index);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -131,6 +135,7 @@ int main(void)
 	MX_TIM3_Init();
 	HAL_ADC_Start_DMA(&hadc1, ADCValue, sizeof(uint16_t)); 
 	HAL_TIM_Base_Start_IT(&htim2);
+	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -395,9 +400,11 @@ void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 	if(IntegratorValue > 2720){
 		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
 		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+		SymbolReceived = 1;
 	}else if(IntegratorValue < 1360){
 		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+		SymbolReceived = 0;
 	}
 }
 
@@ -455,19 +462,18 @@ void ADCBasicMode(void){
 	//Save the previously converted value and pull the current converted value
 	PastConvertedValue = CurrentConvertedValue;
 	CurrentConvertedValue = *ADCValue;
-	EdgeFlag = EdgeDetect(PastConvertedValue, CurrentConvertedValue, &EdgeDetectFlag);
-	
+	EdgeFlag = EdgeDetect(PastConvertedValue, CurrentConvertedValue, &EdgeDetectFlag);	
 	if(EdgeDetectFlag){
 		EdgeDetectFlag = 0;
 		switch(EdgeFlag){
-			case 0:
+			case 2:
 				break;
-			case 'F':
+			case 1:
 				if(IntegratorValue >= 340){
 					IntegratorValue -= 340;
 				}
 				break;
-			case 'R':
+			case 0:
 				if(IntegratorValue <= 3415){
 					IntegratorValue += 680;
 				}
@@ -487,15 +493,20 @@ void ADCBasicMode(void){
  */
 uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag){
 	uint8_t edge = 0;
+	uint8_t flag_temp = 2;
+	
 	
 	if((past_val <= LOWEDGE) && (curr_val >= HIGHEDGE)){
 		edge = 'R'; //Rising edge
+		RiseTimestamp = __HAL_TIM_GetCounter(&htim2);
 		*flag = 1; //edge has been detected
 	}else if((past_val >= HIGHEDGE) && (curr_val <= LOWEDGE)){
+		FallTimestamp = __HAL_TIM_GetCounter(&htim2);
+		flag_temp = PulseSymbolValidation(RiseTimestamp, FallTimestamp, &SymbolRecep); 
 		edge = 'F'; //falling edge
 		*flag = 1; //edge has been detected
 	}
-	return edge;
+	return flag_temp;
 }
 
 /* PulseSymbolValidation
@@ -503,18 +514,18 @@ uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag){
  * within a valid threshold to be a valid transmission.
  *
  * Returns a flag to indicate a symbol was recieved, and writes a 1 
- * (only valid symbol pulses dnote) to an address.
+ * (only valid symbol pulses denote) to an address.
  */
 uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t* symbol){
 	uint32_t difference = 0;
 	uint32_t flag = 0;
 	
-	if(rise_time > fall_time){ //difference calculation
-		difference = rise_time - fall_time;
-	}else if(rise_time < fall_time){
-		difference = ((0xFFFF - fall_time) + rise_time);
+	if(rise_time < fall_time){ //difference calculation
+		difference = fall_time -  rise_time;
+	}else if(rise_time > fall_time){
+		difference = ((0xFFFF - rise_time) + fall_time);
 	}
-	if(difference <= ZEROPULSE){ //determining symbol
+	if(difference >= ZEROPULSE){ //determining symbol
 		*symbol = 1;
 		flag = 1;
 		}				///take RiseTime, FallTIme, symboladdr,::::return receiveflag
@@ -539,6 +550,78 @@ void OutputSymbol (void){
 		HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
 		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port , DecodedOutput_Pin, GPIO_PIN_SET);	
 	}
+}
+
+/*
+ * StartSequenceCheck
+ *
+ * Takes: last_symbol = logic 1 0r 0 from decoded string
+ *				received_ptr = pointer to a variable where each bit indicates a the sequence of received values
+ * 				index = index indicating which bit in *received_ptr is being written to 
+ * 
+ * Returns: flag = indicates whether a start sequence has been decoded
+ *
+ *
+ * Description
+ * 			Looks for the binary pattern 1100 in the deocoded stream to indicate when a start has been indicated
+ * 			Uses index to check individual bits in a variable, and resets the index sequence if pattern doesn't
+ * 			match at any point.
+ *
+ * Example
+ *			StartFlag = StartSequenceCheck(SymbolReceived, SequenceFlags, SequenceIndex);
+ *
+ * Usage note
+ * 		Invoke this at data sampling frequency, not ADC frequency. 
+ *
+ */
+uint8_t StartSequenceCheck(uint32_t last_symbol, uint8_t* received_ptr, uint8_t* index){
+	uint8_t flag = 0;
+	
+	switch (*index) {
+		
+		case 0:
+			*received_ptr += last_symbol << (3 - *index);
+			*index += 1;
+			break;
+		
+		case 1:
+			if(*received_ptr & 0x8){
+				*received_ptr += last_symbol << (3 - *index);
+				*index += 1;
+			}else{
+				*received_ptr = 0;
+				*index = 0;
+			}
+			break;
+			
+		case 2:
+			if(*received_ptr & 0xc){
+				*received_ptr += last_symbol << (3 - *index);
+				*index += 1;
+			}else{
+				*received_ptr = 0;
+				*index = 0;
+			}
+			break;
+			
+		case 3:
+			if(*received_ptr & 0xc){
+				*received_ptr += last_symbol << (3 - *index);
+				*index += 1;
+			}else{
+				*received_ptr = 0;				
+				*index = 0;
+			}
+			break;		
+	}
+	
+	if((*received_ptr & 0xc) && (*index == 3)){
+		*index = 0;
+		*received_ptr = 0;
+		flag = 1;
+	}
+	
+	return flag;
 }
 
 /* USER CODE END 4 */
