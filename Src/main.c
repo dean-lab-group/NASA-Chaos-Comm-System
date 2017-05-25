@@ -52,7 +52,7 @@ UART_HandleTypeDef huart2;
 TIM_HandleTypeDef htim3;
 
 uint32_t IntegratorValue;
-uint32_t* ADCValue;
+uint32_t ADCValue[1];
 
 uint32_t CurrentConvertedValue;
 uint32_t PastConvertedValue;
@@ -461,7 +461,7 @@ void MX_TIM3_Init(void)
 void ADCBasicMode(void){
 	//Save the previously converted value and pull the current converted value
 	PastConvertedValue = CurrentConvertedValue;
-	CurrentConvertedValue = *ADCValue;
+	CurrentConvertedValue = ADCValue[0] & 0xfff;
 	EdgeFlag = EdgeDetect(PastConvertedValue, CurrentConvertedValue, &EdgeDetectFlag);	
 	if(EdgeDetectFlag){
 		EdgeDetectFlag = 0;
