@@ -1,10 +1,16 @@
 /**
   ******************************************************************************
-  * File Name          : mxconstants.h
-  * Description        : This file contains the common defines of the application
+  * @file    stm32_assert.h
+  * @author  MCD Application Team
+  * @version V1.7.1
+  * @date    14-April-2017
+  * @brief   STM32 assert template file.
+  *          This file should be copied to the application folder and renamed
+  *          to stm32_assert.h.
   ******************************************************************************
+  * @attention
   *
-  * COPYRIGHT(c) 2017 STMicroelectronics
+  * <h2><center>&copy; COPYRIGHT(c) 2017 STMicroelectronics</center></h2>
   *
   * Redistribution and use in source and binary forms, with or without modification,
   * are permitted provided that the following conditions are met:
@@ -30,42 +36,40 @@
   *
   ******************************************************************************
   */
+
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __MXCONSTANT_H
-#define __MXCONSTANT_H
-  /* Includes ------------------------------------------------------------------*/
+#ifndef __STM32_ASSERT_H
+#define __STM32_ASSERT_H
 
-/* USER CODE BEGIN Includes */
+#ifdef __cplusplus
+ extern "C" {
+#endif
 
-/* USER CODE END Includes */
-
-/* Private define ------------------------------------------------------------*/
-
-#define B1_Pin GPIO_PIN_13
-#define B1_GPIO_Port GPIOC
-#define SampleInput_Pin GPIO_PIN_0
-#define SampleInput_GPIO_Port GPIOA
-#define IntegratorSignal_Pin GPIO_PIN_4
-#define IntegratorSignal_GPIO_Port GPIOA
-#define LD2_Pin GPIO_PIN_5
-#define LD2_GPIO_Port GPIOA
-#define DecodedOutput_Pin GPIO_PIN_8
-#define DecodedOutput_GPIO_Port GPIOA
-#define TimerOut_Pin GPIO_PIN_8
-#define TimerOut_GPIO_Port GPIOB
-/* USER CODE BEGIN Private defines */
-#define LOWEDGE 500
-#define HIGHEDGE 2000
-#define ZEROPULSE 447
-/* USER CODE END Private defines */
-
+/* Exported types ------------------------------------------------------------*/
+/* Exported constants --------------------------------------------------------*/
+/* Includes ------------------------------------------------------------------*/
+/* Exported macro ------------------------------------------------------------*/
+#ifdef  USE_FULL_ASSERT
 /**
-  * @}
-  */ 
+  * @brief  The assert_param macro is used for function's parameters check.
+  * @param  expr: If expr is false, it calls assert_failed function
+  *         which reports the name of the source file and the source
+  *         line number of the call that failed.
+  *         If expr is true, it returns no value.
+  * @retval None
+  */
+  #define assert_param(expr) ((expr) ? (void)0U : assert_failed((uint8_t *)__FILE__, __LINE__))
+/* Exported functions ------------------------------------------------------- */
+  void assert_failed(uint8_t* file, uint32_t line);
+#else
+  #define assert_param(expr) ((void)0U)
+#endif /* USE_FULL_ASSERT */
 
-/**
-  * @}
-*/ 
+#ifdef __cplusplus
+}
+#endif
 
-#endif /* __MXCONSTANT_H */
+#endif /* __STM32_ASSERT_H */
+
+
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
