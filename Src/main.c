@@ -41,6 +41,7 @@
 
 /* USER CODE BEGIN Includes */
 #include "extern_declare.h"
+#define ZEROPULSE 4000
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -50,12 +51,12 @@ DMA_HandleTypeDef hdma_adc1;
 DAC_HandleTypeDef hdac;
 
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-TIM_HandleTypeDef htim3;
 
 uint32_t IntegratorValue;
 uint32_t ADCValue[1];
@@ -73,6 +74,8 @@ uint32_t ReceiveFlag;
 uint32_t AlreadyProcessedFlag;
 uint32_t EdgeDetectFlag;
 uint32_t SymbolRecep;
+
+uint32_t difference = 0;
 
 char buffer[10];
 int n;
@@ -97,13 +100,13 @@ static void MX_ADC1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_DAC_Init(void);
+static void MX_TIM3_Init(void);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
                                 
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-void MX_TIM3_Init(void);
 void ADCBasicMode(void);
 uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag);
 uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t* symbol);
@@ -144,11 +147,12 @@ int main(void)
   MX_TIM2_Init();
   MX_USART2_UART_Init();
   MX_DAC_Init();
+  MX_TIM3_Init();
 
   /* USER CODE BEGIN 2 */
-	MX_TIM3_Init();
 	HAL_ADC_Start_DMA(&hadc1, ADCValue, sizeof(uint16_t)); 
-	HAL_TIM_OC_Start_IT(&htim2, TIM_CHANNEL_3);
+	HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_3);
+  HAL_TIM_Base_Start(&htim3);
 	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
   /* USER CODE END 2 */
 
@@ -302,7 +306,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 89;
+  htim2.Init.Period = 90;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
@@ -343,6 +347,53 @@ static void MX_TIM2_Init(void)
   }
 
   HAL_TIM_MspPostInit(&htim2);
+
+}
+
+/* TIM3 init function */
+static void MX_TIM3_Init(void)
+{
+
+  TIM_ClockConfigTypeDef sClockSourceConfig;
+  TIM_MasterConfigTypeDef sMasterConfig;
+  TIM_OC_InitTypeDef sConfigOC;
+
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 0xffff;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  if (HAL_TIM_OC_Init(&htim3) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sConfigOC.OCMode = TIM_OCMODE_TIMING;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_OC_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
 
 }
 
@@ -443,51 +494,7 @@ void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 	}
 }
 
-void MX_TIM3_Init(void)
-{
 
-  TIM_ClockConfigTypeDef sClockSourceConfig;
-  TIM_MasterConfigTypeDef sMasterConfig;
-  TIM_OC_InitTypeDef sConfigOC;
-
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 0;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 0xffff;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  if (HAL_TIM_OC_Init(&htim3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  sConfigOC.OCMode = TIM_OCMODE_TIMING;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_OC_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-}
 
 /* ADCBasicMode
  * Contains edge detection and processing logic for
@@ -502,15 +509,18 @@ void ADCBasicMode(void){
 		EdgeDetectFlag = 0;
 		switch(EdgeFlag){
 			case 2:
+				if(IntegratorValue >= 680){
+				//	IntegratorValue -= 1000;
+				}				
 				break;
 			case 1:
-				if(IntegratorValue >= 340){
-					IntegratorValue -= 340;
+				if(IntegratorValue >= 680){
+					IntegratorValue = 0;
 				}
 				break;
 			case 0:
-				if(IntegratorValue <= 3415){
-					IntegratorValue += 680;
+				if(IntegratorValue <= 3410){
+					IntegratorValue = 4095;
 				}
 				break;
 		}
@@ -530,20 +540,17 @@ uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag){
 	uint8_t edge = 0;
 	uint8_t flag_temp = 2;
 	
-	
-	if((past_val <= LOWEDGE) && (curr_val >= HIGHEDGE)){
-		edge = 'R'; //Rising edge
-		RiseTimestamp = __HAL_TIM_GetCounter(&htim2);
-		//HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 4095);
-		//*flag = 1; //edge has been detected
-	}else if((past_val >= HIGHEDGE) && (curr_val <= LOWEDGE)){
-		FallTimestamp = __HAL_TIM_GetCounter(&htim2);
-	//	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0);
+	if((past_val >= HIGHEDGE) && (curr_val <= LOWEDGE)){
+		FallTimestamp = __HAL_TIM_GetCounter(&htim3);
+		edge = 'F'; //falling edge
 		flag_temp = PulseSymbolValidation(RiseTimestamp, FallTimestamp, &SymbolRecep); 
 		*flag = 1; //edge has been detected
-		edge = 'F'; //falling edge
-		
+	}else if((past_val <= LOWEDGE) && (curr_val >= HIGHEDGE)){
+		edge = 'R'; //Rising edge
+		RiseTimestamp = __HAL_TIM_GetCounter(&htim3);
+		//*flag = 1; //edge has been detected		
 	}
+	
 	return flag_temp;
 }
 
@@ -555,18 +562,20 @@ uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag){
  * (only valid symbol pulses denote) to an address.
  */
 uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t* symbol){
-	uint32_t difference = 0;
+	//uint32_t difference = 0;
 	uint32_t flag = 0;
-	
+	//____----_____
 	if(rise_time < fall_time){ //difference calculation
 		difference = fall_time -  rise_time;
 	}else if(rise_time > fall_time){
-		difference = ((0xFFFF - rise_time) + fall_time);
-	}
-	if(difference <= ZEROPULSE){ //determining symbol
+		difference = ((0xffff - rise_time) + fall_time);
+	}	
+	if(difference >= ZEROPULSE){ //determining symbol
 		*symbol = 1;
 		flag = 1;
-		}				///take RiseTime, FallTime, symboladdr,::::return receiveflag
+	}		
+		///take RiseTime, FallTime, symboladdr,::::return receiveflag
+
 	return flag;
 }
 
@@ -580,13 +589,13 @@ void OutputSymbol (void){
 	if(ZeroFlag && !AlreadyProcessedFlag){	//This is if a zero was detected, but not processed yet
 		n = sprintf(buffer, "%d\n\r", 0);
 		HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
-		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port , DecodedOutput_Pin, GPIO_PIN_RESET);	
+		//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port , DecodedOutput_Pin, GPIO_PIN_RESET);	
 		AlreadyProcessedFlag = 1; //show zero has been processed, and clear the zero flag
 		ZeroFlag = 0;	
 	}else if(!ZeroFlag){ //if no zero was detected by the timer
 		n = sprintf(buffer, "%d\n\r", 1);
 		HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
-		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port , DecodedOutput_Pin, GPIO_PIN_SET);	
+		//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port , DecodedOutput_Pin, GPIO_PIN_SET);	
 	}
 }
 

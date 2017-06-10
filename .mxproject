@@ -1,6 +1,6 @@
 [PreviousGenFiles]
-HeaderPath=C:/Users/azm0043/Documents/Programs/BackEndDecoder/Inc
-SourcePath=C:/Users/azm0043/Documents/Programs/BackEndDecoder/Src
+HeaderPath=C:/Users/andre/Documents/Programming/BackEndDecoder/Inc
+SourcePath=C:/Users/andre/Documents/Programming/BackEndDecoder/Src
 SourceFiles=stm32f4xx_it.h;stm32f4xx_hal_conf.h;mxconstants.h;stm32f4xx_it.c;stm32f4xx_hal_msp.c;main.c;;main.h;
 HeaderFiles=stm32f4xx_it.h;stm32f4xx_hal_conf.h;;main.h;
 

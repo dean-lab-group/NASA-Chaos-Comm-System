@@ -65,7 +65,7 @@
 /* USER CODE BEGIN Private defines */
 #define LOWEDGE 500
 #define HIGHEDGE 2000
-#define ZEROPULSE 447
+//#define ZEROPULSE 2000
 /* USER CODE END Private defines */
 
 void _Error_Handler(char *, int);
