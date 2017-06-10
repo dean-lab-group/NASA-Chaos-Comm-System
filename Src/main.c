@@ -201,7 +201,7 @@ void ReadCustomData(void){
 	
 	p = sprintf((char *)buffer, "Please enter in your own input:\n");
 	HAL_UART_Transmit(&huart2, buffer, p,50);
-	HAL_UART_Receive(&huart2, recbuff, 1, 10000);
+	HAL_UART_Receive(&huart2, recbuff, 2, 10000);
 	p = 0;
 	for(i=0;i<8;i++){
 		sendbuff[i] = (recbuff[0] & (0x1 << i));
@@ -209,20 +209,35 @@ void ReadCustomData(void){
 		//p++;
 	}
 			
-	for(int j=0;j<12;j++){ //Flag a start to the sequence
-				while(!togglecheck){
+	for(int z = 0; z<2; z++){
+		for(int j=0;j<12;j++){ //Flag a start to the sequence
+					while(!togglecheck){
+					}
+					HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);	
+					HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+					togglecheck = 0;
 				}
-				HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);	
-				HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-				togglecheck = 0;
-			}
-	HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);
+	}
+	for(int z = 0; z<2; z++){
+		for(int j=0;j<12;j++){ //Flag a start to the sequence
+					while(!togglecheck){
+					}
+					HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);	
+					HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+					togglecheck = 0;
+				}
+		HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);
+	}
+				
 				
 	for(i=0;i<8;i++){
 		if(sendbuff[i] == 1){
 			ManchesterOne();
+			sendbuff[i] = 0;
 		}else if(sendbuff[i] == 0){
-			ManchesterZero();			
+			ManchesterZero();
+			sendbuff[i] = 0;			
 		}
 	}
 	
