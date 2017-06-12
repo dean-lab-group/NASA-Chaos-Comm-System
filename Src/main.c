@@ -40,7 +40,7 @@
 #include "stm32f4xx_hal.h"
 
 /* USER CODE BEGIN Includes */
-#include "extern_declare.h"
+//#include "extern_declare.h"
 #define ZEROPULSE 4000
 /* USER CODE END Includes */
 
@@ -52,6 +52,7 @@ DAC_HandleTypeDef hdac;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim6;
 
 UART_HandleTypeDef huart2;
 
@@ -84,11 +85,13 @@ volatile uint32_t CustomDataMode;
 volatile uint32_t CustomData;
 volatile uint32_t CustomIndex;
 volatile uint32_t CustomModeEdgeFlag;
+volatile uint32_t SerialModeFlag = 0;
 
 uint32_t SymbolReceived;
-uint8_t* SequenceFlags;
-uint8_t* SequenceIndex;
-uint8_t StartFlag = 0;
+uint32_t SequenceFlags;
+uint32_t SequenceIndex;
+uint32_t StartFlag = 0;
+
 
 /* USER CODE END PV */
 
@@ -101,6 +104,7 @@ static void MX_TIM2_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_DAC_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_TIM6_Init(void);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
                                 
@@ -110,7 +114,7 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void ADCBasicMode(void);
 uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag);
 uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t* symbol);
-uint8_t StartSequenceCheck(uint32_t last_symbol, uint8_t* received_ptr, uint8_t* index);
+uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_t index);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -148,12 +152,15 @@ int main(void)
   MX_USART2_UART_Init();
   MX_DAC_Init();
   MX_TIM3_Init();
+  MX_TIM6_Init();
 
   /* USER CODE BEGIN 2 */
-	HAL_ADC_Start_DMA(&hadc1, ADCValue, sizeof(uint16_t)); 
+	HAL_ADC_Start_DMA(&hadc1, ADCValue, sizeof(uint16_t));
+	HAL_TIM_Base_Start_IT(&htim6);	
 	HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_3);
   HAL_TIM_Base_Start(&htim3);
 	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -397,6 +404,30 @@ static void MX_TIM3_Init(void)
 
 }
 
+/* TIM6 init function */
+static void MX_TIM6_Init(void)
+{
+
+  TIM_MasterConfigTypeDef sMasterConfig;
+
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 89;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 714;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+}
+
 /* USART2 init function */
 static void MX_USART2_UART_Init(void)
 {
@@ -494,7 +525,16 @@ void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 	}
 }
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+	SerialModeFlag = 1;
+}
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+	if(htim->Instance == TIM6){
+		StartFlag = StartSequenceCheck(SymbolReceived, SequenceFlags, SequenceIndex);
+
+	}
+}
 
 /* ADCBasicMode
  * Contains edge detection and processing logic for
@@ -621,50 +661,50 @@ void OutputSymbol (void){
  * 		Invoke this at data sampling frequency, not ADC frequency. 
  *
  */
-uint8_t StartSequenceCheck(uint32_t last_symbol, uint8_t* received_ptr, uint8_t* index){
+uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_t index){
 	uint8_t flag = 0;
 	
-	switch (*index) {
+	switch (index) {
 		
 		case 0:
-			*received_ptr += last_symbol << (3 - *index);
-			*index += 1;
+			received_ptr += last_symbol << (3 - index);
+			index += 1;
 			break;
 		
 		case 1:
-			if(*received_ptr & 0x8){
-				*received_ptr += last_symbol << (3 - *index);
-				*index += 1;
+			if(received_ptr & 0x8){
+				received_ptr += last_symbol << (3 - index);
+				index += 1;
 			}else{
-				*received_ptr = 0;
-				*index = 0;
+				received_ptr = 0;
+				index = 0;
 			}
 			break;
 			
 		case 2:
-			if(*received_ptr & 0xc){
-				*received_ptr += last_symbol << (3 - *index);
-				*index += 1;
+			if(received_ptr & 0xc){
+				received_ptr += last_symbol << (3 - index);
+				index += 1;
 			}else{
-				*received_ptr = 0;
-				*index = 0;
+				received_ptr = 0;
+				index = 0;
 			}
 			break;
 			
 		case 3:
-			if(*received_ptr & 0xc){
-				*received_ptr += last_symbol << (3 - *index);
-				*index += 1;
+			if(received_ptr & 0xc){
+				received_ptr += last_symbol << (3 - index);
+				index += 1;
 			}else{
-				*received_ptr = 0;				
-				*index = 0;
+				received_ptr = 0;				
+				index = 0;
 			}
 			break;		
 	}
 	
-	if((*received_ptr & 0xc) && (*index == 3)){
-		*index = 0;
-		*received_ptr = 0;
+	if((received_ptr & 0xc) && (index == 3)){
+		index = 0;
+		received_ptr = 0;
 		flag = 1;
 	}
 	
