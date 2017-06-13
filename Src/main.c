@@ -58,6 +58,7 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
+uint32_t dbgflg = 0;
 
 uint32_t IntegratorValue;
 uint32_t ADCValue[1];
@@ -87,10 +88,10 @@ volatile uint32_t CustomIndex;
 volatile uint32_t CustomModeEdgeFlag;
 volatile uint32_t SerialModeFlag = 0;
 
-uint32_t SymbolReceived;
-uint32_t SequenceFlags;
-uint32_t SequenceIndex;
-uint32_t StartFlag = 0;
+volatile uint32_t SymbolReceived;
+volatile uint32_t SequenceFlags;
+volatile uint32_t SequenceIndex;
+volatile uint32_t StartFlag = 0;
 
 
 /* USER CODE END PV */
@@ -514,15 +515,6 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 	ADCBasicMode();
-	if(IntegratorValue > 2720){
-		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-		SymbolReceived = 1;
-	}else if(IntegratorValue < 1360){
-		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-		SymbolReceived = 0;
-	}
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
@@ -532,7 +524,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance == TIM6){
 		StartFlag = StartSequenceCheck(SymbolReceived, SequenceFlags, SequenceIndex);
-
+		if(StartFlag){
+			dbgflg += 1;
+		}
 	}
 }
 
@@ -563,6 +557,15 @@ void ADCBasicMode(void){
 					IntegratorValue = 4095;
 				}
 				break;
+		}
+		if(IntegratorValue > 2720){
+			HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+			SymbolReceived = 1;
+		}else if(IntegratorValue < 1360){
+			HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+			SymbolReceived = 0;
 		}
 		HAL_DAC_SetValue(&hdac, DAC1_CHANNEL_1, DAC_ALIGN_12B_R, IntegratorValue); 
 	}
@@ -664,47 +667,39 @@ void OutputSymbol (void){
 uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_t index){
 	uint8_t flag = 0;
 	
-	switch (index) {
-		
-		case 0:
-			received_ptr += last_symbol << (3 - index);
-			index += 1;
-			break;
-		
-		case 1:
-			if(received_ptr & 0x8){
-				received_ptr += last_symbol << (3 - index);
-				index += 1;
+
+		if(SequenceIndex == 0){
+			SequenceFlags += SymbolReceived << (3 - SequenceIndex);
+			SequenceIndex += 1;		
+		}else if(SequenceIndex == 1){
+			if(SequenceFlags & 0x8){
+				SequenceFlags += SymbolReceived << (3 - SequenceIndex);
+				SequenceIndex += 1;
 			}else{
-				received_ptr = 0;
-				index = 0;
+				SequenceFlags = 0;
+				SequenceIndex = 0;
 			}
-			break;
+		}else if(SequenceIndex == 2){
+			if(SequenceFlags & 0xc){
+				SequenceFlags += SymbolReceived << (3 - SequenceIndex);
+				SequenceIndex += 1;
+			}else{
+				SequenceFlags = 0;
+				SequenceIndex = 0;
+			}
+		}else if(SequenceIndex == 3){
+			if(SequenceFlags & 0xc){
+				SequenceFlags += SymbolReceived << (3 - SequenceIndex);
+				SequenceIndex += 1;
+			}else{
+				SequenceFlags = 0;				
+				SequenceIndex = 0;
+			}
+		}		
 			
-		case 2:
-			if(received_ptr & 0xc){
-				received_ptr += last_symbol << (3 - index);
-				index += 1;
-			}else{
-				received_ptr = 0;
-				index = 0;
-			}
-			break;
-			
-		case 3:
-			if(received_ptr & 0xc){
-				received_ptr += last_symbol << (3 - index);
-				index += 1;
-			}else{
-				received_ptr = 0;				
-				index = 0;
-			}
-			break;		
-	}
-	
-	if((received_ptr & 0xc) && (index == 3)){
-		index = 0;
-		received_ptr = 0;
+	if((SequenceFlags & 0xc) && (SequenceIndex == 3)){
+		SequenceIndex = 1;
+		SequenceFlags = 0;
 		flag = 1;
 	}
 	
