@@ -59,6 +59,7 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
 uint32_t dbgflg = 0;
+uint32_t dbg2 = 0;
 
 uint32_t IntegratorValue;
 uint32_t ADCValue[1];
@@ -157,7 +158,6 @@ int main(void)
 
   /* USER CODE BEGIN 2 */
 	HAL_ADC_Start_DMA(&hadc1, ADCValue, sizeof(uint16_t));
-	HAL_TIM_Base_Start_IT(&htim6);	
 	HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_3);
   HAL_TIM_Base_Start(&htim3);
 	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
@@ -412,9 +412,9 @@ static void MX_TIM6_Init(void)
   TIM_MasterConfigTypeDef sMasterConfig;
 
   htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 89;
+  htim6.Init.Prescaler = 0;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 714;
+  htim6.Init.Period = 60000;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
@@ -514,7 +514,39 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
-	ADCBasicMode();
+	CurrentConvertedValue = ADCValue[0];
+	
+	EdgeFlag = EdgeDetect(PastConvertedValue, CurrentConvertedValue, &EdgeDetectFlag);	
+	
+	if(EdgeDetectFlag){
+		if(!(htim6.Instance->CR1 && TIM_CR1_CEN)){
+			HAL_TIM_Base_Start_IT(&htim6);	
+		}
+		EdgeDetectFlag = 0;
+		switch(EdgeFlag){
+			case 2:
+				if(IntegratorValue >= 680){
+				}				
+				break;
+			case 1:
+					IntegratorValue = 0;
+				break;
+			case 0:
+					IntegratorValue = 4095;
+				break;
+		}
+	}
+	
+	
+	if(IntegratorValue > 2047){
+		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+		SymbolReceived = 1;
+	}else if(IntegratorValue <= 2047){
+		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+		SymbolReceived = 0;
+	}
+	
+	PastConvertedValue = CurrentConvertedValue;
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
@@ -522,53 +554,22 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+	
 	if(htim->Instance == TIM6){
 		StartFlag = StartSequenceCheck(SymbolReceived, SequenceFlags, SequenceIndex);
-		if(StartFlag){
-			dbgflg += 1;
+		if(StartFlag == 1){
+			dbgflg++;
+			dbg2 = SymbolReceived;
 		}
-	}
+	}		
 }
-
 /* ADCBasicMode
  * Contains edge detection and processing logic for
  * "debug" mode.
  */
 void ADCBasicMode(void){
 	//Save the previously converted value and pull the current converted value
-	PastConvertedValue = CurrentConvertedValue;
-	CurrentConvertedValue = ADCValue[0] & 0xfff;
-	EdgeFlag = EdgeDetect(PastConvertedValue, CurrentConvertedValue, &EdgeDetectFlag);	
-	if(EdgeDetectFlag){
-		EdgeDetectFlag = 0;
-		switch(EdgeFlag){
-			case 2:
-				if(IntegratorValue >= 680){
-				//	IntegratorValue -= 1000;
-				}				
-				break;
-			case 1:
-				if(IntegratorValue >= 680){
-					IntegratorValue = 0;
-				}
-				break;
-			case 0:
-				if(IntegratorValue <= 3410){
-					IntegratorValue = 4095;
-				}
-				break;
-		}
-		if(IntegratorValue > 2720){
-			HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-			SymbolReceived = 1;
-		}else if(IntegratorValue < 1360){
-			HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-			SymbolReceived = 0;
-		}
-		HAL_DAC_SetValue(&hdac, DAC1_CHANNEL_1, DAC_ALIGN_12B_R, IntegratorValue); 
-	}
+	
 	
 }
 
@@ -667,37 +668,36 @@ void OutputSymbol (void){
 uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_t index){
 	uint8_t flag = 0;
 	
-
-		if(SequenceIndex == 0){
+	//dbg2 = SymbolReceived;
+	if(SequenceIndex == 0){
+		SequenceFlags += SymbolReceived << (3 - SequenceIndex);
+		SequenceIndex += 1;		
+	}else if(SequenceIndex == 1){
+		if(SequenceFlags == 0x8){
 			SequenceFlags += SymbolReceived << (3 - SequenceIndex);
-			SequenceIndex += 1;		
-		}else if(SequenceIndex == 1){
-			if(SequenceFlags & 0x8){
-				SequenceFlags += SymbolReceived << (3 - SequenceIndex);
-				SequenceIndex += 1;
-			}else{
-				SequenceFlags = 0;
-				SequenceIndex = 0;
-			}
-		}else if(SequenceIndex == 2){
-			if(SequenceFlags & 0xc){
-				SequenceFlags += SymbolReceived << (3 - SequenceIndex);
-				SequenceIndex += 1;
-			}else{
-				SequenceFlags = 0;
-				SequenceIndex = 0;
-			}
-		}else if(SequenceIndex == 3){
-			if(SequenceFlags & 0xc){
-				SequenceFlags += SymbolReceived << (3 - SequenceIndex);
-				SequenceIndex += 1;
-			}else{
-				SequenceFlags = 0;				
-				SequenceIndex = 0;
-			}
-		}		
-			
-	if((SequenceFlags & 0xc) && (SequenceIndex == 3)){
+			SequenceIndex += 1;
+		}else{
+			SequenceFlags = 0;
+			SequenceIndex = 0;
+		}
+	}else if(SequenceIndex == 2){
+		if(SequenceFlags == 0xc){
+			SequenceFlags += SymbolReceived << (3 - SequenceIndex);
+			SequenceIndex += 1;
+		}else{
+			SequenceFlags = 0;
+			SequenceIndex = 0;
+		}
+	}else if(SequenceIndex == 3){
+		if(SequenceFlags == 0xc){
+			SequenceFlags += SymbolReceived << (3 - SequenceIndex);
+			SequenceIndex += 1;
+		}else{
+			SequenceFlags = 0;				
+			SequenceIndex = 0;
+		}
+	}
+	if((SequenceFlags == 0xc) && (SequenceIndex == 3)){
 		SequenceIndex = 1;
 		SequenceFlags = 0;
 		flag = 1;
