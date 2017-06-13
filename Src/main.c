@@ -412,9 +412,9 @@ static void MX_TIM6_Init(void)
   TIM_MasterConfigTypeDef sMasterConfig;
 
   htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 0;
+  htim6.Init.Prescaler = 89;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 60000;
+  htim6.Init.Period = 714;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
@@ -498,6 +498,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : FeedbackSignal_Pin */
+  GPIO_InitStruct.Pin = FeedbackSignal_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(FeedbackSignal_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : TimerOut_Pin */
   GPIO_InitStruct.Pin = TimerOut_Pin;
