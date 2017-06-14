@@ -61,6 +61,7 @@
 #define DecodedOutput_GPIO_Port GPIOA
 #define FeedbackSignal_Pin GPIO_PIN_5
 #define FeedbackSignal_GPIO_Port GPIOB
+#define FeedbackSignal_EXTI_IRQn EXTI9_5_IRQn
 #define TimerOut_Pin GPIO_PIN_8
 #define TimerOut_GPIO_Port GPIOB
 
