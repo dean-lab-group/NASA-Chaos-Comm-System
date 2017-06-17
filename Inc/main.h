@@ -57,11 +57,12 @@
 #define LD2_GPIO_Port GPIOA
 #define SampleFreq_Pin GPIO_PIN_10
 #define SampleFreq_GPIO_Port GPIOB
+#define FeedOut_Pin GPIO_PIN_7
+#define FeedOut_GPIO_Port GPIOC
 #define DecodedOutput_Pin GPIO_PIN_8
 #define DecodedOutput_GPIO_Port GPIOA
-#define FeedbackSignal_Pin GPIO_PIN_5
-#define FeedbackSignal_GPIO_Port GPIOB
-#define FeedbackSignal_EXTI_IRQn EXTI9_5_IRQn
+#define FeedIn_Pin GPIO_PIN_6
+#define FeedIn_GPIO_Port GPIOB
 #define TimerOut_Pin GPIO_PIN_8
 #define TimerOut_GPIO_Port GPIOB
 

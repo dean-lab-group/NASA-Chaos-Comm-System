@@ -42,6 +42,8 @@
 /* USER CODE BEGIN Includes */
 //#include "extern_declare.h"
 #define ZEROPULSE 4000
+#define INPUT_RISE 'R'
+#define INPUT_FALL 'F'
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -52,6 +54,7 @@ DAC_HandleTypeDef hdac;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim6;
 
 UART_HandleTypeDef huart2;
@@ -72,23 +75,15 @@ uint32_t RiseTimestamp;
 uint32_t TimeDiff;
 
 uint8_t  EdgeFlag;
-uint32_t ZeroFlag;
-uint32_t ReceiveFlag;
-uint32_t AlreadyProcessedFlag;
+uint32_t FilteredSignal;
 uint32_t EdgeDetectFlag;
-uint32_t SymbolRecep;
 
 uint32_t difference = 0;
 
 char buffer[10];
 int n;
 
-volatile uint32_t CustomDataMode;
-volatile uint32_t CustomData;
-volatile uint32_t CustomIndex;
-volatile uint32_t CustomModeEdgeFlag;
 volatile uint32_t SerialModeFlag = 0;
-
 volatile uint32_t SymbolReceived;
 volatile uint32_t SequenceFlags;
 volatile uint32_t SequenceIndex;
@@ -107,6 +102,7 @@ static void MX_USART2_UART_Init(void);
 static void MX_DAC_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM6_Init(void);
+static void MX_TIM4_Init(void);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
                                 
@@ -115,7 +111,7 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 /* Private function prototypes -----------------------------------------------*/
 void ADCBasicMode(void);
 uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag);
-uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t* symbol);
+uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time);
 uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_t index);
 /* USER CODE END PFP */
 
@@ -155,11 +151,13 @@ int main(void)
   MX_DAC_Init();
   MX_TIM3_Init();
   MX_TIM6_Init();
+  MX_TIM4_Init();
 
   /* USER CODE BEGIN 2 */
 	HAL_ADC_Start_DMA(&hadc1, ADCValue, sizeof(uint16_t));
 	HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_3);
   HAL_TIM_Base_Start(&htim3);
+	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
 	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
 
   /* USER CODE END 2 */
@@ -405,6 +403,41 @@ static void MX_TIM3_Init(void)
 
 }
 
+/* TIM4 init function */
+static void MX_TIM4_Init(void)
+{
+
+  TIM_MasterConfigTypeDef sMasterConfig;
+  TIM_IC_InitTypeDef sConfigIC;
+
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 0;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 0xffff;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  if (HAL_TIM_IC_Init(&htim4) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim4, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+}
+
 /* TIM6 init function */
 static void MX_TIM6_Init(void)
 {
@@ -484,6 +517,9 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, LD2_Pin|DecodedOutput_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(FeedOut_GPIO_Port, FeedOut_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(TimerOut_GPIO_Port, TimerOut_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
@@ -492,18 +528,26 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD2_Pin DecodedOutput_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin|DecodedOutput_Pin;
+  /*Configure GPIO pin : LD2_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : FeedbackSignal_Pin */
-  GPIO_InitStruct.Pin = FeedbackSignal_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  /*Configure GPIO pin : FeedOut_Pin */
+  GPIO_InitStruct.Pin = FeedOut_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(FeedbackSignal_GPIO_Port, &GPIO_InitStruct);
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(FeedOut_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : DecodedOutput_Pin */
+  GPIO_InitStruct.Pin = DecodedOutput_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(DecodedOutput_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : TimerOut_Pin */
   GPIO_InitStruct.Pin = TimerOut_Pin;
@@ -513,49 +557,76 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(TimerOut_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
+	if(htim->Instance == TIM4){ 
+		switch(EdgeFlag){
+			case INPUT_RISE:
+				RiseTimestamp = __HAL_TIM_GET_COMPARE(&htim6, TIM_CHANNEL_1);
+				TIM_RESET_CAPTUREPOLARITY(&htim6, TIM_CHANNEL_1);
+				TIM_SET_CAPTUREPOLARITY(&htim6, TIM_CHANNEL_1, TIM_ICPOLARITY_FALLING);
+				break;
+			case INPUT_FALL:
+				FallTimestamp = __HAL_TIM_GET_COMPARE(&htim6, TIM_CHANNEL_1);
+				TIM_RESET_CAPTUREPOLARITY(&htim6, TIM_CHANNEL_1);
+				TIM_SET_CAPTUREPOLARITY(&htim6, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);
+				FilteredSignal = PulseSymbolValidation(RiseTimestamp, FallTimestamp);
+				break;
+		}
+	}
+}
+	
 void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 	CurrentConvertedValue = ADCValue[0];
+	PastConvertedValue = CurrentConvertedValue;
 	
 	EdgeFlag = EdgeDetect(PastConvertedValue, CurrentConvertedValue, &EdgeDetectFlag);	
-	
-	if(EdgeDetectFlag){
-		if(!(htim6.Instance->CR1 && TIM_CR1_CEN)){
-			HAL_TIM_Base_Start_IT(&htim6);	
-		}
+	if(EdgeDetectFlag == 1){
 		EdgeDetectFlag = 0;
 		switch(EdgeFlag){
-			case 2:
-				if(IntegratorValue >= 680){
-				}				
+			case INPUT_RISE:
+				HAL_GPIO_WritePin(FeedOut_GPIO_Port, FeedOut_Pin, GPIO_PIN_SET);
 				break;
-			case 1:
-					IntegratorValue = 0;
-				break;
-			case 0:
-					IntegratorValue = 4095;
-				break;
+			case INPUT_FALL:
+				HAL_GPIO_WritePin(FeedOut_GPIO_Port, FeedOut_Pin, GPIO_PIN_RESET);
+				break;			
 		}
 	}
-	
-	
-	if(IntegratorValue > 2047){
-		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
-		SymbolReceived = 1;
-	}else if(IntegratorValue <= 2047){
-		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
-		SymbolReceived = 0;
-	}
-	
-	PastConvertedValue = CurrentConvertedValue;
+//	
+//	if(EdgeDetectFlag){
+//		if(!(htim6.Instance->CR1 && TIM_CR1_CEN)){
+//			HAL_TIM_Base_Start_IT(&htim6);	
+//		}
+//		EdgeDetectFlag = 0;
+//		switch(EdgeFlag){
+//			case 2:
+//				if(IntegratorValue >= 680){
+//				}				
+//				break;
+//			case 1:
+//					IntegratorValue = 0;
+//				break;
+//			case 0:
+//					IntegratorValue = 4095;
+//				break;
+//		}
+//	}
+//	
+//	
+//	if(IntegratorValue > 2047){
+//		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+//		SymbolReceived = 1;
+//	}else if(IntegratorValue <= 2047){
+//		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+//		SymbolReceived = 0;
+//	}
+//	
+//	
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
@@ -565,21 +636,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	
 	if(htim->Instance == TIM6){
-		StartFlag = StartSequenceCheck(SymbolReceived, SequenceFlags, SequenceIndex);
-		if(StartFlag == 1){
-			dbgflg++;
-			dbg2 = SymbolReceived;
-		}
+		//StartFlag = StartSequenceCheck(SymbolReceived, SequenceFlags, SequenceIndex);
+		dbg2 = FilteredSignal;
 	}		
-}
-/* ADCBasicMode
- * Contains edge detection and processing logic for
- * "debug" mode.
- */
-void ADCBasicMode(void){
-	//Save the previously converted value and pull the current converted value
-	
-	
 }
 
 /* EdgeDetect
@@ -591,20 +650,16 @@ void ADCBasicMode(void){
  */
 uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag){
 	uint8_t edge = 0;
-	uint8_t flag_temp = 2;
 	
 	if((past_val >= HIGHEDGE) && (curr_val <= LOWEDGE)){
-		FallTimestamp = __HAL_TIM_GetCounter(&htim3);
-		edge = 'F'; //falling edge
-		flag_temp = PulseSymbolValidation(RiseTimestamp, FallTimestamp, &SymbolRecep); 
-		*flag = 1; //edge has been detected
+		edge = INPUT_FALL; //falling edge
+		*flag = 1;
 	}else if((past_val <= LOWEDGE) && (curr_val >= HIGHEDGE)){
-		edge = 'R'; //Rising edge
-		RiseTimestamp = __HAL_TIM_GetCounter(&htim3);
-		//*flag = 1; //edge has been detected		
+		edge = INPUT_RISE; //Rising edge
+		*flag = 1;
 	}
 	
-	return flag_temp;
+	return edge;
 }
 
 /* PulseSymbolValidation
@@ -614,8 +669,7 @@ uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag){
  * Returns a flag to indicate a symbol was recieved, and writes a 1 
  * (only valid symbol pulses denote) to an address.
  */
-uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t* symbol){
-	//uint32_t difference = 0;
+uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time){
 	uint32_t flag = 0;
 	//____----_____
 	if(rise_time < fall_time){ //difference calculation
@@ -624,11 +678,8 @@ uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t*
 		difference = ((0xffff - rise_time) + fall_time);
 	}	
 	if(difference >= ZEROPULSE){ //determining symbol
-		*symbol = 1;
 		flag = 1;
 	}		
-		///take RiseTime, FallTime, symboladdr,::::return receiveflag
-
 	return flag;
 }
 
@@ -639,17 +690,17 @@ uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time, uint32_t*
  */
 void OutputSymbol (void){
 	
-	if(ZeroFlag && !AlreadyProcessedFlag){	//This is if a zero was detected, but not processed yet
-		n = sprintf(buffer, "%d\n\r", 0);
-		HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
-		//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port , DecodedOutput_Pin, GPIO_PIN_RESET);	
-		AlreadyProcessedFlag = 1; //show zero has been processed, and clear the zero flag
-		ZeroFlag = 0;	
-	}else if(!ZeroFlag){ //if no zero was detected by the timer
-		n = sprintf(buffer, "%d\n\r", 1);
-		HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
-		//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port , DecodedOutput_Pin, GPIO_PIN_SET);	
-	}
+//	if(ZeroFlag && !AlreadyProcessedFlag){	//This is if a zero was detected, but not processed yet
+//		n = sprintf(buffer, "%d\n\r", 0);
+//		HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
+//		//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port , DecodedOutput_Pin, GPIO_PIN_RESET);	
+//		AlreadyProcessedFlag = 1; //show zero has been processed, and clear the zero flag
+//		ZeroFlag = 0;	
+//	}else if(!ZeroFlag){ //if no zero was detected by the timer
+//		n = sprintf(buffer, "%d\n\r", 1);
+//		HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
+//		//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port , DecodedOutput_Pin, GPIO_PIN_SET);	
+//	}
 }
 
 /*
