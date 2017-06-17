@@ -158,6 +158,7 @@ int main(void)
 	HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_3);
   HAL_TIM_Base_Start(&htim3);
 	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
+
 	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
 
   /* USER CODE END 2 */
@@ -312,7 +313,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 90;
+  htim2.Init.Period = 45;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
@@ -567,14 +568,14 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance == TIM4){ 
 		switch(EdgeFlag){
 			case INPUT_RISE:
-				RiseTimestamp = __HAL_TIM_GET_COMPARE(&htim6, TIM_CHANNEL_1);
-				TIM_RESET_CAPTUREPOLARITY(&htim6, TIM_CHANNEL_1);
-				TIM_SET_CAPTUREPOLARITY(&htim6, TIM_CHANNEL_1, TIM_ICPOLARITY_FALLING);
+				RiseTimestamp = __HAL_TIM_GET_COMPARE(&htim4, TIM_CHANNEL_1);
+				TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
+				TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_FALLING);
 				break;
 			case INPUT_FALL:
-				FallTimestamp = __HAL_TIM_GET_COMPARE(&htim6, TIM_CHANNEL_1);
-				TIM_RESET_CAPTUREPOLARITY(&htim6, TIM_CHANNEL_1);
-				TIM_SET_CAPTUREPOLARITY(&htim6, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);
+				FallTimestamp = __HAL_TIM_GET_COMPARE(&htim4, TIM_CHANNEL_1);
+				TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
+				TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);
 				FilteredSignal = PulseSymbolValidation(RiseTimestamp, FallTimestamp);
 				break;
 		}
@@ -582,11 +583,14 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 }
 	
 void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
+
 	CurrentConvertedValue = ADCValue[0];
-	PastConvertedValue = CurrentConvertedValue;
 	
 	EdgeFlag = EdgeDetect(PastConvertedValue, CurrentConvertedValue, &EdgeDetectFlag);	
 	if(EdgeDetectFlag == 1){
+		if(!(htim6.Instance->CR1 && TIM_CR1_CEN)){
+			HAL_TIM_Base_Start_IT(&htim6);	
+		}
 		EdgeDetectFlag = 0;
 		switch(EdgeFlag){
 			case INPUT_RISE:
@@ -597,6 +601,7 @@ void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 				break;			
 		}
 	}
+	PastConvertedValue = CurrentConvertedValue;
 //	
 //	if(EdgeDetectFlag){
 //		if(!(htim6.Instance->CR1 && TIM_CR1_CEN)){
@@ -638,6 +643,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance == TIM6){
 		//StartFlag = StartSequenceCheck(SymbolReceived, SequenceFlags, SequenceIndex);
 		dbg2 = FilteredSignal;
+		HAL_GPIO_TogglePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin);
+//		if(dbg2 == 1){
+//			HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+//		}else if(dbg2 == 0){
+//			HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+//		}
 	}		
 }
 
@@ -651,10 +662,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag){
 	uint8_t edge = 0;
 	
-	if((past_val >= HIGHEDGE) && (curr_val <= LOWEDGE)){
+	if((past_val >= MIDPOINT) && (curr_val <= MIDPOINT)){
 		edge = INPUT_FALL; //falling edge
 		*flag = 1;
-	}else if((past_val <= LOWEDGE) && (curr_val >= HIGHEDGE)){
+	}else if((past_val <= MIDPOINT) && (curr_val >= MIDPOINT)){
 		edge = INPUT_RISE; //Rising edge
 		*flag = 1;
 	}
@@ -677,7 +688,7 @@ uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time){
 	}else if(rise_time > fall_time){
 		difference = ((0xffff - rise_time) + fall_time);
 	}	
-	if(difference >= ZEROPULSE){ //determining symbol
+	if(difference <= ZEROPULSE){ //determining symbol
 		flag = 1;
 	}		
 	return flag;

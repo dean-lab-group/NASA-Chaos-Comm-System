@@ -69,6 +69,7 @@
 /* USER CODE BEGIN Private defines */
 #define LOWEDGE 500
 #define HIGHEDGE 2000
+#define MIDPOINT 1240
 //#define ZEROPULSE 2000
 /* USER CODE END Private defines */
 
