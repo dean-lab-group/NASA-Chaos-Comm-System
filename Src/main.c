@@ -643,12 +643,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance == TIM6){
 		//StartFlag = StartSequenceCheck(SymbolReceived, SequenceFlags, SequenceIndex);
 		dbg2 = FilteredSignal;
-		HAL_GPIO_TogglePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin);
-//		if(dbg2 == 1){
-//			HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
-//		}else if(dbg2 == 0){
-//			HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
-//		}
+		//HAL_GPIO_TogglePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin);
+		if(dbg2 == 1){
+			HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+		}else if(dbg2 == 0){
+			HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+		}
 	}		
 }
 
