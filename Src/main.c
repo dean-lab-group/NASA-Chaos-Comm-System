@@ -566,18 +566,33 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance == TIM4){ 
-		switch(EdgeFlag){
-			case INPUT_RISE:
-				RiseTimestamp = __HAL_TIM_GET_COMPARE(&htim4, TIM_CHANNEL_1);
-				TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
-				TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_FALLING);
-				break;
-			case INPUT_FALL:
-				FallTimestamp = __HAL_TIM_GET_COMPARE(&htim4, TIM_CHANNEL_1);
-				TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
-				TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);
-				FilteredSignal = PulseSymbolValidation(RiseTimestamp, FallTimestamp);
-				break;
+			switch(EdgeFlag){
+				case INPUT_RISE:
+					RiseTimestamp = __HAL_TIM_GET_COMPARE(&htim4, TIM_CHANNEL_1);
+					TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
+					TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_FALLING);
+					break;
+				case INPUT_FALL:
+					FallTimestamp = __HAL_TIM_GET_COMPARE(&htim4, TIM_CHANNEL_1);
+					TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
+					TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);
+					FilteredSignal = PulseSymbolValidation(RiseTimestamp, FallTimestamp);
+					if(SerialModeFlag == 0){
+						switch(FilteredSignal){
+							case 0:
+								HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+								break;
+							case 1:
+								HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+								break;
+						}
+					}
+					break;
+			}
+			if(SerialModeFlag==1){
+				if(!(htim6.Instance->CR1 && TIM_CR1_CEN)){
+					HAL_TIM_Base_Start_IT(&htim6);	
+			}
 		}
 	}
 }
@@ -588,9 +603,9 @@ void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 	
 	EdgeFlag = EdgeDetect(PastConvertedValue, CurrentConvertedValue, &EdgeDetectFlag);	
 	if(EdgeDetectFlag == 1){
-		if(!(htim6.Instance->CR1 && TIM_CR1_CEN)){
-			HAL_TIM_Base_Start_IT(&htim6);	
-		}
+//		if(!(htim6.Instance->CR1 && TIM_CR1_CEN)){
+//			HAL_TIM_Base_Start_IT(&htim6);	
+//		}
 		EdgeDetectFlag = 0;
 		switch(EdgeFlag){
 			case INPUT_RISE:
@@ -636,20 +651,30 @@ void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	SerialModeFlag = 1;
+	HAL_TIM_IC_Stop_IT(&htim4, TIM_CHANNEL_1);
+	HAL_TIM_Base_Stop_IT(&htim6);
+	__HAL_TIM_SET_COUNTER(&htim4, 0);
+		__HAL_TIM_SET_COUNTER(&htim6, 0);
+	RiseTimestamp = 0;
+	FallTimestamp = 0;
+	TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
+	TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);	
+	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	
-	if(htim->Instance == TIM6){
-		//StartFlag = StartSequenceCheck(SymbolReceived, SequenceFlags, SequenceIndex);
-		dbg2 = FilteredSignal;
-		//HAL_GPIO_TogglePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin);
-		if(dbg2 == 1){
-			HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
-		}else if(dbg2 == 0){
-			HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
-		}
-	}		
+	if(SerialModeFlag == 1){
+		if(htim->Instance == TIM6){
+			//HAL_GPIO_TogglePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin);
+			StartFlag = StartSequenceCheck(FilteredSignal, SequenceFlags, SequenceIndex);
+			dbg2 = FilteredSignal;
+			if(dbg2 == 1){
+				HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+			}else if(dbg2 == 0){
+				HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+			}
+		}		
+	}
 }
 
 /* EdgeDetect
@@ -741,11 +766,11 @@ uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_
 	
 	//dbg2 = SymbolReceived;
 	if(SequenceIndex == 0){
-		SequenceFlags += SymbolReceived << (3 - SequenceIndex);
+		SequenceFlags += last_symbol << (3 - SequenceIndex);
 		SequenceIndex += 1;		
 	}else if(SequenceIndex == 1){
 		if(SequenceFlags == 0x8){
-			SequenceFlags += SymbolReceived << (3 - SequenceIndex);
+			SequenceFlags += last_symbol << (3 - SequenceIndex);
 			SequenceIndex += 1;
 		}else{
 			SequenceFlags = 0;
@@ -753,7 +778,7 @@ uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_
 		}
 	}else if(SequenceIndex == 2){
 		if(SequenceFlags == 0xc){
-			SequenceFlags += SymbolReceived << (3 - SequenceIndex);
+			SequenceFlags += last_symbol << (3 - SequenceIndex);
 			SequenceIndex += 1;
 		}else{
 			SequenceFlags = 0;
@@ -761,7 +786,7 @@ uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_
 		}
 	}else if(SequenceIndex == 3){
 		if(SequenceFlags == 0xc){
-			SequenceFlags += SymbolReceived << (3 - SequenceIndex);
+			SequenceFlags += last_symbol << (3 - SequenceIndex);
 			SequenceIndex += 1;
 		}else{
 			SequenceFlags = 0;				
