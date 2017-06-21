@@ -627,6 +627,7 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
+	uint32_t tmp = 0;
 	if(htim->Instance == TIM4){ 
 		switch(EdgeFlag){
 			case INPUT_RISE:
@@ -655,6 +656,8 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 			if((htim6.Instance->CR1 && TIM_CR1_CEN) == 0){
 				HAL_TIM_Base_Start_IT(&htim6);
 				if((htim3.Instance->CR1 && TIM_CR1_CEN) == 0){
+					tmp = __HAL_TIM_GetCounter(&htim3) + SAMPLE_DELAY;
+					__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, tmp);
 					HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
 				}
 			}
