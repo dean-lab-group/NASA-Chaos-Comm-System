@@ -42,6 +42,7 @@
 /* USER CODE BEGIN Includes */
 //#include "extern_declare.h"
 #define ZEROPULSE 3777
+#define SAMPLE_DELAY 2550
 #define INPUT_RISE 'R'
 #define INPUT_FALL 'F'
 /* USER CODE END Includes */
@@ -55,6 +56,7 @@ DAC_HandleTypeDef hdac;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim5;
 TIM_HandleTypeDef htim6;
 
 UART_HandleTypeDef huart2;
@@ -103,6 +105,7 @@ static void MX_DAC_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_TIM5_Init(void);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
                                 
@@ -152,11 +155,11 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM6_Init();
   MX_TIM4_Init();
+  MX_TIM5_Init();
 
   /* USER CODE BEGIN 2 */
 	HAL_ADC_Start_DMA(&hadc1, ADCValue, sizeof(uint16_t));
 	HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_3);
-  HAL_TIM_Base_Start(&htim3);
 	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
 
 	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
@@ -408,6 +411,7 @@ static void MX_TIM3_Init(void)
 static void MX_TIM4_Init(void)
 {
 
+  TIM_ClockConfigTypeDef sClockSourceConfig;
   TIM_MasterConfigTypeDef sMasterConfig;
   TIM_IC_InitTypeDef sConfigIC;
 
@@ -416,6 +420,17 @@ static void MX_TIM4_Init(void)
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim4.Init.Period = 0xffff;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
   if (HAL_TIM_IC_Init(&htim4) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
@@ -433,6 +448,53 @@ static void MX_TIM4_Init(void)
   sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
   sConfigIC.ICFilter = 0;
   if (HAL_TIM_IC_ConfigChannel(&htim4, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+}
+
+/* TIM5 init function */
+static void MX_TIM5_Init(void)
+{
+
+  TIM_ClockConfigTypeDef sClockSourceConfig;
+  TIM_MasterConfigTypeDef sMasterConfig;
+  TIM_OC_InitTypeDef sConfigOC;
+
+  htim5.Instance = TIM5;
+  htim5.Init.Prescaler = 0;
+  htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim5.Init.Period = 56366;
+  htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim5, &sClockSourceConfig) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  if (HAL_TIM_OC_Init(&htim5) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sConfigOC.OCMode = TIM_OCMODE_TIMING;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_OC_ConfigChannel(&htim5, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
@@ -566,37 +628,40 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance == TIM4){ 
-			switch(EdgeFlag){
-				case INPUT_RISE:
-					RiseTimestamp = __HAL_TIM_GET_COMPARE(&htim4, TIM_CHANNEL_1);
-					TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
-					TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_FALLING);
-					break;
-				case INPUT_FALL:
-					FallTimestamp = __HAL_TIM_GET_COMPARE(&htim4, TIM_CHANNEL_1);
-					TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
-					TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);
-					FilteredSignal = PulseSymbolValidation(RiseTimestamp, FallTimestamp);
-					if(SerialModeFlag == 0){
-						switch(FilteredSignal){
-							case 0:
-								HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
-								break;
-							case 1:
-								HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
-								break;
-						}
+		switch(EdgeFlag){
+			case INPUT_RISE:
+				RiseTimestamp = __HAL_TIM_GET_COMPARE(&htim4, TIM_CHANNEL_1);
+				TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
+				TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_FALLING);
+				break;
+			case INPUT_FALL:
+				FallTimestamp = __HAL_TIM_GET_COMPARE(&htim4, TIM_CHANNEL_1);
+				TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
+				TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);
+				FilteredSignal = PulseSymbolValidation(RiseTimestamp, FallTimestamp);
+				if(SerialModeFlag == 0){
+					switch(FilteredSignal){
+						case 0:
+							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+							break;
+						case 1:
+							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+							break;
 					}
-					break;
-			}
-			if(SerialModeFlag==1){
-				if(!(htim6.Instance->CR1 && TIM_CR1_CEN)){
-					HAL_TIM_Base_Start_IT(&htim6);	
+				}
+				break;
+		}	
+		if(SerialModeFlag==1){
+			if((htim6.Instance->CR1 && TIM_CR1_CEN) == 0){
+				HAL_TIM_Base_Start_IT(&htim6);
+				if((htim3.Instance->CR1 && TIM_CR1_CEN) == 0){
+					HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
+				}
 			}
 		}
 	}
 }
-	
+
 void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 
 	CurrentConvertedValue = ADCValue[0];
@@ -663,10 +728,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	if(SerialModeFlag == 1){
-		if(htim->Instance == TIM6){
-			//HAL_GPIO_TogglePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin);
-			StartFlag = StartSequenceCheck(FilteredSignal, SequenceFlags, SequenceIndex);
+	if(htim->Instance == TIM6){
+		if(SerialModeFlag == 1){
+			//StartFlag = StartSequenceCheck(FilteredSignal, SequenceFlags, SequenceIndex);
 			dbg2 = FilteredSignal;
 			if(dbg2 == 1){
 				HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
@@ -674,7 +738,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 				HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
 			}
 		}		
+	}else if(htim->Instance == TIM5){
+		if(SerialModeFlag == 1){
+			HAL_GPIO_TogglePin(DebugOutput_GPIO_Port, DebugOutput_Pin);
+		}
 	}
+}
+
+void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
+	if(htim->Instance==TIM3){
+		HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_1);
+		HAL_TIM_Base_Start_IT(&htim5);	
+	}	
 }
 
 /* EdgeDetect
