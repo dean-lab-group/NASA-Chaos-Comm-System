@@ -63,11 +63,11 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-uint32_t dbgflg = 0;
-uint32_t dbg2 = 0;
+volatile uint32_t dbgflg = 0;
+volatile uint32_t dbg2 = 0;
 
 uint32_t IntegratorValue;
-uint32_t ADCValue[1];
+volatile uint32_t ADCValue[1];
 
 uint32_t CurrentConvertedValue;
 uint32_t PastConvertedValue;
@@ -77,7 +77,7 @@ uint32_t RiseTimestamp;
 uint32_t TimeDiff;
 
 uint8_t  EdgeFlag;
-uint32_t FilteredSignal;
+volatile uint32_t FilteredSignal;
 uint32_t EdgeDetectFlag;
 
 uint32_t difference = 0;
@@ -90,6 +90,8 @@ volatile uint32_t SymbolReceived;
 volatile uint32_t SequenceFlags;
 volatile uint32_t SequenceIndex;
 volatile uint32_t StartFlag = 0;
+volatile uint8_t SerialSequenceReceived[8];
+volatile uint32_t SerialIndex = 7;
 
 
 /* USER CODE END PV */
@@ -116,6 +118,7 @@ void ADCBasicMode(void);
 uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag);
 uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time);
 uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_t index);
+void OutputSymbol (void);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -161,7 +164,6 @@ int main(void)
 	HAL_ADC_Start_DMA(&hadc1, ADCValue, sizeof(uint16_t));
 	HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_3);
 	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
-
 	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
 
   /* USER CODE END 2 */
@@ -733,7 +735,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance == TIM6){
 		if(SerialModeFlag == 1){
-			//StartFlag = StartSequenceCheck(FilteredSignal, SequenceFlags, SequenceIndex);
 			dbg2 = FilteredSignal;
 			if(dbg2 == 1){
 				HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
@@ -744,6 +745,22 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	}else if(htim->Instance == TIM5){
 		if(SerialModeFlag == 1){
 			HAL_GPIO_TogglePin(DebugOutput_GPIO_Port, DebugOutput_Pin);
+			dbgflg = HAL_GPIO_ReadPin(DecodedOutput_GPIO_Port, DecodedOutput_Pin);
+			if(StartFlag == 1){
+				SerialSequenceReceived[SerialIndex] = dbg2;
+				SerialIndex--;
+				if(SerialIndex == 0){
+					//HAL_TIM_IC_Stop_IT(&htim4,TIM_CHANNEL_1);
+					SerialIndex = 7;
+					StartFlag = 0;
+					OutputSymbol();
+					for(int i = 0; i<7; i++){
+						SerialSequenceReceived[i] = 0;
+					}
+				}
+			}else if (StartFlag == 0){
+				StartFlag = StartSequenceCheck(dbgflg, SequenceFlags, SequenceIndex);
+			}
 		}
 	}
 }
@@ -803,18 +820,20 @@ uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time){
  *  It also writes 1 or 0 to the UART (seen through USB COM Port
  */
 void OutputSymbol (void){
+	int p=0; 
+	uint8_t buffer[100];
+	uint8_t compressedsequence = 0;
 	
-//	if(ZeroFlag && !AlreadyProcessedFlag){	//This is if a zero was detected, but not processed yet
-//		n = sprintf(buffer, "%d\n\r", 0);
-//		HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
-//		//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port , DecodedOutput_Pin, GPIO_PIN_RESET);	
-//		AlreadyProcessedFlag = 1; //show zero has been processed, and clear the zero flag
-//		ZeroFlag = 0;	
-//	}else if(!ZeroFlag){ //if no zero was detected by the timer
-//		n = sprintf(buffer, "%d\n\r", 1);
-//		HAL_UART_Transmit_IT(&huart2, (uint8_t*) buffer, n);
-//		//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port , DecodedOutput_Pin, GPIO_PIN_SET);	
-//	}
+	p = sprintf((char *)buffer, "TESTING\r\n");
+	//HAL_UART_Transmit(&huart2, buffer, p,50);
+
+	for(int i = 0; i<8; i++){
+		compressedsequence += SerialSequenceReceived[i] << (8-i);
+	}
+	p = sprintf((char *)buffer, "%c \n\r", compressedsequence);
+//	HAL_UART_Transmit(&huart2, buffer, p,50);
+	
+	//HAL_TIM_IC_Start_IT(&htim4,TIM_CHANNEL_1);
 }
 
 /*
