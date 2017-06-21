@@ -61,6 +61,8 @@
 #define FeedOut_GPIO_Port GPIOC
 #define DecodedOutput_Pin GPIO_PIN_8
 #define DecodedOutput_GPIO_Port GPIOA
+#define DebugOutput_Pin GPIO_PIN_10
+#define DebugOutput_GPIO_Port GPIOA
 #define FeedIn_Pin GPIO_PIN_6
 #define FeedIn_GPIO_Port GPIOB
 #define TimerOut_Pin GPIO_PIN_8

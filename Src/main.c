@@ -515,7 +515,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LD2_Pin|DecodedOutput_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|DecodedOutput_Pin|DebugOutput_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(FeedOut_GPIO_Port, FeedOut_Pin, GPIO_PIN_RESET);
@@ -543,12 +543,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(FeedOut_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : DecodedOutput_Pin */
-  GPIO_InitStruct.Pin = DecodedOutput_Pin;
+  /*Configure GPIO pins : DecodedOutput_Pin DebugOutput_Pin */
+  GPIO_InitStruct.Pin = DecodedOutput_Pin|DebugOutput_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  HAL_GPIO_Init(DecodedOutput_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : TimerOut_Pin */
   GPIO_InitStruct.Pin = TimerOut_Pin;
