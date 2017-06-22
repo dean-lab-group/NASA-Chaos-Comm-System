@@ -43,6 +43,7 @@
 //#include "extern_declare.h"
 #define ZEROPULSE 3777
 #define SAMPLE_DELAY 2550
+#define EIGHT_TWO_MSDELAY 8200
 #define INPUT_RISE 'R'
 #define INPUT_FALL 'F'
 /* USER CODE END Includes */
@@ -53,6 +54,7 @@ DMA_HandleTypeDef hdma_adc1;
 
 DAC_HandleTypeDef hdac;
 
+TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
@@ -87,6 +89,7 @@ uint32_t PulseIndex = 0;
 uint32_t CountEntries = 0;
 uint32_t SymbolIndex = 0;
 uint32_t RecoveredSignal = 0;
+uint32_t CollectFlag = 0;
 
 char buffer[10];
 int n;
@@ -114,6 +117,7 @@ static void MX_TIM3_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM5_Init(void);
+static void MX_TIM1_Init(void);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
                                 
@@ -166,6 +170,7 @@ int main(void)
   MX_TIM6_Init();
   MX_TIM4_Init();
   MX_TIM5_Init();
+  MX_TIM1_Init();
 
   /* USER CODE BEGIN 2 */
 	HAL_ADC_Start_DMA(&hadc1, ADCValue, sizeof(uint16_t));
@@ -308,6 +313,70 @@ static void MX_DAC_Init(void)
   sConfig.DAC_Trigger = DAC_TRIGGER_NONE;
   sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
   if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_1) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+}
+
+/* TIM1 init function */
+static void MX_TIM1_Init(void)
+{
+
+  TIM_ClockConfigTypeDef sClockSourceConfig;
+  TIM_MasterConfigTypeDef sMasterConfig;
+  TIM_OC_InitTypeDef sConfigOC;
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig;
+
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 84;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 0xffff;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  if (HAL_TIM_OC_Init(&htim1) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sConfigOC.OCMode = TIM_OCMODE_TOGGLE;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  if (HAL_TIM_OC_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
@@ -658,6 +727,9 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
 							break;
 					}
+					if(CollectFlag == 1){
+						PulseArray[PulseIndex] = FilteredSignal;
+					}
 				}
 				break;
 		}	
@@ -740,6 +812,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+	uint32_t tmp = 0;
+	
 	if(htim->Instance == TIM6){
 		if(SerialModeFlag == 1){
 			dbg2 = FilteredSignal;
@@ -754,19 +828,25 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 			HAL_GPIO_TogglePin(DebugOutput_GPIO_Port, DebugOutput_Pin);
 			dbgflg = HAL_GPIO_ReadPin(DecodedOutput_GPIO_Port, DecodedOutput_Pin);
 			if(StartFlag == 1){
-				SerialSequenceReceived[SerialIndex] = dbg2;
-				SerialIndex--;
-				if(SerialIndex == 0){ ////don't stop at index=0, hasn't stored in array[0] yet
-					//HAL_TIM_IC_Stop_IT(&htim4,TIM_CHANNEL_1);
-					SerialIndex = 7;
-					StartFlag = 0;
-					OutputSymbol();
-					for(int i = 0; i<7; i++){
-						SerialSequenceReceived[i] = 0;
-					}
-				}
+//				SerialSequenceReceived[SerialIndex] = dbg2;
+//				SerialIndex--;
+//				if(SerialIndex == 0){ ////don't stop at index=0, hasn't stored in array[0] yet
+//					//HAL_TIM_IC_Stop_IT(&htim4,TIM_CHANNEL_1);
+//					SerialIndex = 7;
+//					StartFlag = 0;
+//					OutputSymbol();
+//					for(int i = 0; i<7; i++){
+//						SerialSequenceReceived[i] = 0;
+//					}
+//				}
 			}else if (StartFlag == 0){
 				StartFlag = StartSequenceCheck(dbgflg, SequenceFlags, SequenceIndex);
+				if(StartFlag == 1){
+					tmp = __HAL_TIM_GetCounter(&htim1);
+					__HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_2, tmp + EIGHT_TWO_MSDELAY);
+					HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_2);
+					CollectFlag = 1;
+				}
 			}
 		}
 	}
@@ -776,7 +856,11 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance==TIM3){
 		HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_1);
 		HAL_TIM_Base_Start_IT(&htim5);	
-	}	
+	}else if(htim->Instance == TIM1){
+		CollectFlag = 0;
+		HAL_TIM_OC_Stop_IT(&htim1, TIM_CHANNEL_2);
+		SequenceCheck();
+	}
 }
 
 /* EdgeDetect
@@ -929,6 +1013,12 @@ void SequenceCheck(void){
 		for(int n = 0; n < num; n++){
 			RecoveredSignal += ValueCheck << (SymbolIndex - n - 1);
 		}
+	}
+	PulseIndex = 0;
+	CountEntries = 0;
+	SymbolIndex = 0;
+	for(int i=0; i<80; i++){
+		PulseArray[i] = 0;
 	}
 }
 /* USER CODE END 4 */
