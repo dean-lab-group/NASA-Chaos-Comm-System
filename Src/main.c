@@ -67,7 +67,7 @@ volatile uint32_t dbgflg = 0;
 volatile uint32_t dbg2 = 0;
 
 uint32_t IntegratorValue;
-volatile uint32_t ADCValue[1];
+uint32_t ADCValue[1];
 
 uint32_t CurrentConvertedValue;
 uint32_t PastConvertedValue;
@@ -75,12 +75,18 @@ uint32_t PastConvertedValue;
 uint32_t FallTimestamp;
 uint32_t RiseTimestamp;
 uint32_t TimeDiff;
-
 uint8_t  EdgeFlag;
 volatile uint32_t FilteredSignal;
 uint32_t EdgeDetectFlag;
 
 uint32_t difference = 0;
+
+uint32_t ValueCheck;
+uint32_t PulseArray[80];
+uint32_t PulseIndex = 0;
+uint32_t CountEntries = 0;
+uint32_t SymbolIndex = 0;
+uint32_t RecoveredSignal = 0;
 
 char buffer[10];
 int n;
@@ -119,6 +125,7 @@ uint8_t EdgeDetect(uint32_t past_val, uint32_t curr_val, uint32_t* flag);
 uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time);
 uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_t index);
 void OutputSymbol (void);
+void SequenceCheck(void);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -724,7 +731,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	HAL_TIM_IC_Stop_IT(&htim4, TIM_CHANNEL_1);
 	HAL_TIM_Base_Stop_IT(&htim6);
 	__HAL_TIM_SET_COUNTER(&htim4, 0);
-		__HAL_TIM_SET_COUNTER(&htim6, 0);
+	__HAL_TIM_SET_COUNTER(&htim6, 0);
 	RiseTimestamp = 0;
 	FallTimestamp = 0;
 	TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
@@ -749,7 +756,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 			if(StartFlag == 1){
 				SerialSequenceReceived[SerialIndex] = dbg2;
 				SerialIndex--;
-				if(SerialIndex == 0){
+				if(SerialIndex == 0){ ////don't stop at index=0, hasn't stored in array[0] yet
 					//HAL_TIM_IC_Stop_IT(&htim4,TIM_CHANNEL_1);
 					SerialIndex = 7;
 					StartFlag = 0;
@@ -825,10 +832,10 @@ void OutputSymbol (void){
 	uint8_t compressedsequence = 0;
 	
 	p = sprintf((char *)buffer, "TESTING\r\n");
-	//HAL_UART_Transmit(&huart2, buffer, p,50);
+	HAL_UART_Transmit(&huart2, buffer, p,50);
 
 	for(int i = 0; i<8; i++){
-		compressedsequence += SerialSequenceReceived[i] << (8-i);
+		compressedsequence += SerialSequenceReceived[i] << (7-i);
 	}
 	p = sprintf((char *)buffer, "%c \n\r", compressedsequence);
 //	HAL_UART_Transmit(&huart2, buffer, p,50);
@@ -891,7 +898,7 @@ uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_
 		}
 	}
 	if((SequenceFlags == 0xc) && (SequenceIndex == 3)){
-		SequenceIndex = 1;
+		SequenceIndex = 0;
 		SequenceFlags = 0;
 		flag = 1;
 	}
@@ -899,6 +906,31 @@ uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_
 	return flag;
 }
 
+void SequenceCheck(void){
+	int index = 0;
+	int num = 0;
+	
+	while(index <= PulseIndex){
+		ValueCheck = PulseArray[index];
+		while(PulseArray[index] == ValueCheck){
+			index++;
+			CountEntries++;
+		}
+		switch(ValueCheck){
+			case 0:
+				num = CountEntries / 6; 
+				break;
+			case 1:
+				num = CountEntries / 10; 
+				break;					
+		}
+		CountEntries = 0;
+		SymbolIndex += num;
+		for(int n = 0; n < num; n++){
+			RecoveredSignal += ValueCheck << (SymbolIndex - n - 1);
+		}
+	}
+}
 /* USER CODE END 4 */
 
 /**
