@@ -546,7 +546,7 @@ static void MX_TIM5_Init(void)
   htim5.Instance = TIM5;
   htim5.Init.Prescaler = 0;
   htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim5.Init.Period = 56366;
+  htim5.Init.Period = 3523;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
   {
@@ -742,11 +742,11 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 		if(SerialModeFlag==1){
 			if((htim6.Instance->CR1 && TIM_CR1_CEN) == 0){
 				HAL_TIM_Base_Start_IT(&htim6);
-				if((htim3.Instance->CR1 && TIM_CR1_CEN) == 0){
-					tmp = __HAL_TIM_GetCounter(&htim3) + SAMPLE_DELAY;
-					__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, tmp);
-					HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
-				}
+//				if((htim3.Instance->CR1 && TIM_CR1_CEN) == 0){
+//					tmp = __HAL_TIM_GetCounter(&htim3) + SAMPLE_DELAY;
+//					__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, tmp);
+//					HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
+//				}
 			}
 		}
 	}
@@ -848,9 +848,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 			}else if (StartFlag == 0){
 			//	StartFlag = StartSequenceCheck(dbgflg, SequenceFlags, SequenceIndex);
 				if(StartFlag == 1){
-					tmp = __HAL_TIM_GetCounter(&htim1);
-					__HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_2, tmp + EIGHT_TWO_MSDELAY);
-					HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_2);
+//					tmp = __HAL_TIM_GetCounter(&htim1);
+//					__HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_2, tmp + EIGHT_TWO_MSDELAY);
+//					HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_2);
 					CollectFlag = 1;
 				}
 			}
