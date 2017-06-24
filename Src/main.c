@@ -721,16 +721,16 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 				TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
 				TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);
 				FilteredSignal = PulseSymbolValidation(RiseTimestamp, FallTimestamp);
-//				if(SerialModeFlag == 0){
-//					switch(FilteredSignal){
-//						case 0:
-//							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
-//							break;
-//						case 1:
-//							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
-//							break;
-//					}
-//				}
+				if(SerialModeFlag == 0){
+					switch(FilteredSignal){
+						case 0:
+							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+							break;
+						case 1:
+							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+							break;
+					}
+				}
 				PulseArray[PulseIndex] = FilteredSignal;
 				if(PulseIndex < 70){
 					PulseIndex++;
@@ -739,16 +739,16 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 				}
 				break;
 		}	
-//		if(SerialModeFlag==1){
-//			if((htim6.Instance->CR1 && TIM_CR1_CEN) == 0){
-//				HAL_TIM_Base_Start_IT(&htim6);
-//				if((htim3.Instance->CR1 && TIM_CR1_CEN) == 0){
-//					tmp = __HAL_TIM_GetCounter(&htim3) + SAMPLE_DELAY;
-//					__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, tmp);
-//					HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
-//				}
-//			}
-//		}
+		if(SerialModeFlag==1){
+			if((htim6.Instance->CR1 && TIM_CR1_CEN) == 0){
+				HAL_TIM_Base_Start_IT(&htim6);
+				if((htim3.Instance->CR1 && TIM_CR1_CEN) == 0){
+					tmp = __HAL_TIM_GetCounter(&htim3) + SAMPLE_DELAY;
+					__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, tmp);
+					HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
+				}
+			}
+		}
 	}
 }
 
@@ -806,67 +806,67 @@ void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	SerialModeFlag = 1;
-//	HAL_TIM_IC_Stop_IT(&htim4, TIM_CHANNEL_1);
-//	HAL_TIM_Base_Stop_IT(&htim6);
-//	__HAL_TIM_SET_COUNTER(&htim4, 0);
-//	__HAL_TIM_SET_COUNTER(&htim6, 0);
-//	RiseTimestamp = 0;
-//	FallTimestamp = 0;
-//	TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
-//	TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);	
-//	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
+	HAL_TIM_IC_Stop_IT(&htim4, TIM_CHANNEL_1);
+	HAL_TIM_Base_Stop_IT(&htim6);
+	__HAL_TIM_SET_COUNTER(&htim4, 0);
+	__HAL_TIM_SET_COUNTER(&htim6, 0);
+	RiseTimestamp = 0;
+	FallTimestamp = 0;
+	TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
+	TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);	
+	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	uint32_t tmp = 0;
 	
-//	if(htim->Instance == TIM6){
-//		if(SerialModeFlag == 1){
-//			dbg2 = FilteredSignal;
-//			if(dbg2 == 1){
-//				HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
-//			}else if(dbg2 == 0){
-//				HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
-//			}
-//		}		
-//	}else if(htim->Instance == TIM5){
-//		if(SerialModeFlag == 1){
-//			HAL_GPIO_TogglePin(DebugOutput_GPIO_Port, DebugOutput_Pin);
-//			dbgflg = HAL_GPIO_ReadPin(DecodedOutput_GPIO_Port, DecodedOutput_Pin);
-//			if(StartFlag == 1){
-////				SerialSequenceReceived[SerialIndex] = dbg2;
-////				SerialIndex--;
-////				if(SerialIndex == 0){ ////don't stop at index=0, hasn't stored in array[0] yet
-////					//HAL_TIM_IC_Stop_IT(&htim4,TIM_CHANNEL_1);
-////					SerialIndex = 7;
-////					StartFlag = 0;
-////					OutputSymbol();
-////					for(int i = 0; i<7; i++){
-////						SerialSequenceReceived[i] = 0;
-////					}
-////				}
-//			}else if (StartFlag == 0){
-//			//	StartFlag = StartSequenceCheck(dbgflg, SequenceFlags, SequenceIndex);
-//				if(StartFlag == 1){
-//					tmp = __HAL_TIM_GetCounter(&htim1);
-//					__HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_2, tmp + EIGHT_TWO_MSDELAY);
-//					HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_2);
-//					CollectFlag = 1;
+	if(htim->Instance == TIM6){
+		if(SerialModeFlag == 1){
+			dbg2 = FilteredSignal;
+			if(dbg2 == 1){
+				HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+			}else if(dbg2 == 0){
+				HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+			}
+		}		
+	}else if(htim->Instance == TIM5){
+		if(SerialModeFlag == 1){
+			HAL_GPIO_TogglePin(DebugOutput_GPIO_Port, DebugOutput_Pin);
+			dbgflg = HAL_GPIO_ReadPin(DecodedOutput_GPIO_Port, DecodedOutput_Pin);
+			if(StartFlag == 1){
+//				SerialSequenceReceived[SerialIndex] = dbg2;
+//				SerialIndex--;
+//				if(SerialIndex == 0){ ////don't stop at index=0, hasn't stored in array[0] yet
+//					//HAL_TIM_IC_Stop_IT(&htim4,TIM_CHANNEL_1);
+//					SerialIndex = 7;
+//					StartFlag = 0;
+//					OutputSymbol();
+//					for(int i = 0; i<7; i++){
+//						SerialSequenceReceived[i] = 0;
+//					}
 //				}
-//			}
-//		}
-//	}
+			}else if (StartFlag == 0){
+			//	StartFlag = StartSequenceCheck(dbgflg, SequenceFlags, SequenceIndex);
+				if(StartFlag == 1){
+					tmp = __HAL_TIM_GetCounter(&htim1);
+					__HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_2, tmp + EIGHT_TWO_MSDELAY);
+					HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_2);
+					CollectFlag = 1;
+				}
+			}
+		}
+	}
 }
 
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
-//	if(htim->Instance==TIM3){
-//		HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_1);
-//		HAL_TIM_Base_Start_IT(&htim5);	
-//	}else if(htim->Instance == TIM1){
-//		CollectFlag = 0;
-//		HAL_TIM_OC_Stop_IT(&htim1, TIM_CHANNEL_2);
-//		SequenceCheck();
-//	}
+	if(htim->Instance==TIM3){
+		HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_1);
+		HAL_TIM_Base_Start_IT(&htim5);	
+	}else if(htim->Instance == TIM1){
+		CollectFlag = 0;
+		HAL_TIM_OC_Stop_IT(&htim1, TIM_CHANNEL_2);
+		SequenceCheck();
+	}
 }
 
 /* EdgeDetect
