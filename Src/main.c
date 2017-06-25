@@ -65,14 +65,18 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-volatile uint32_t dbgflg = 0;
-volatile uint32_t dbg2 = 0;
+uint32_t dbgflg = 0;
+uint32_t dbg2 = 0;
 
 int index_seq = 0;
 int num = 0;
 
 uint32_t IntegratorValue;
 uint32_t ADCValue[1];
+
+uint32_t OverSampleCounter = 0;
+uint32_t OnesCounter = 0;
+uint32_t ZeroDetected = 0;
 
 uint32_t CurrentConvertedValue;
 uint32_t PastConvertedValue;
@@ -81,7 +85,7 @@ uint32_t FallTimestamp;
 uint32_t RiseTimestamp;
 uint32_t TimeDiff;
 uint8_t  EdgeFlag;
-volatile uint32_t FilteredSignal;
+uint32_t FilteredSignal;
 uint32_t EdgeDetectFlag;
 
 uint32_t difference = 0;
@@ -97,13 +101,13 @@ uint32_t CollectFlag = 0;
 char buffer[10];
 int n;
 
-volatile uint32_t SerialModeFlag = 0;
-volatile uint32_t SymbolReceived;
-volatile uint32_t SequenceFlags;
-volatile uint32_t SequenceIndex;
-volatile uint32_t StartFlag = 0;
-volatile uint8_t SerialSequenceReceived[8];
-volatile uint32_t SerialIndex = 7;
+uint32_t SerialModeFlag = 0;
+uint32_t SymbolReceived;
+uint32_t SequenceFlags;
+uint32_t SequenceIndex;
+uint32_t StartFlag = 0;
+uint8_t SerialSequenceReceived[8];
+uint32_t SerialIndex = 7;
 
 
 /* USER CODE END PV */
@@ -133,6 +137,7 @@ uint32_t PulseSymbolValidation(uint32_t rise_time, uint32_t fall_time);
 uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_t index);
 void OutputSymbol (void);
 void SequenceCheck(void);
+uint32_t IntegratorAdjust(uint32_t signal, uint32_t integrator);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -180,6 +185,7 @@ int main(void)
 	HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_3);
 	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
 	//HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+//	HAL_TIM_Base_Start_IT(&htim5);
 
   /* USER CODE END 2 */
 
@@ -708,7 +714,7 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
-	uint32_t tmp = 0;
+//	uint32_t tmp = 0;
 	if(htim->Instance == TIM4){ 
 		switch(EdgeFlag){
 			case INPUT_RISE:
@@ -721,31 +727,40 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 				TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
 				TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);
 				FilteredSignal = PulseSymbolValidation(RiseTimestamp, FallTimestamp);
+				IntegratorValue = IntegratorAdjust(FilteredSignal, IntegratorValue);
+
 				if(SerialModeFlag == 0){
 					switch(FilteredSignal){
 						case 0:
+							ZeroDetected = 1;
 							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+							if((OnesCounter != 0) && (ZeroDetected != 0)){
+								if((htim5.Instance->CR1 && TIM_CR1_CEN) == 0){
+									HAL_TIM_Base_Start_IT(&htim5);
+								}
+							}
+							OnesCounter = 0;
 							break;
 						case 1:
 							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+							ZeroDetected = 0;
+							OnesCounter++;
 							break;
 					}
 				}
-				PulseArray[PulseIndex] = FilteredSignal;
-				if(PulseIndex < 70){
-					PulseIndex++;
-				}else{
-					PulseIndex = 0;
-				}
+//				PulseArray[PulseIndex] = FilteredSignal;
+//				if(PulseIndex < 70){
+//					PulseIndex++;
+//				}else{
+//					PulseIndex = 0;
+//				}
 				break;
 		}	
 		if(SerialModeFlag==1){
 			if((htim6.Instance->CR1 && TIM_CR1_CEN) == 0){
 				HAL_TIM_Base_Start_IT(&htim6);
-//				if((htim3.Instance->CR1 && TIM_CR1_CEN) == 0){
-//					tmp = __HAL_TIM_GetCounter(&htim3) + SAMPLE_DELAY;
-//					__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, tmp);
-//					HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
+//				if((htim5.Instance->CR1 && TIM_CR1_CEN) == 0){
+//					HAL_TIM_Base_Start_IT(&htim5);
 //				}
 			}
 		}
@@ -830,10 +845,22 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 			}
 		}		
 	}else if(htim->Instance == TIM5){
-		if(SerialModeFlag == 1){
-			HAL_GPIO_TogglePin(DebugOutput_GPIO_Port, DebugOutput_Pin);
-			dbgflg = HAL_GPIO_ReadPin(DecodedOutput_GPIO_Port, DecodedOutput_Pin);
-			if(StartFlag == 1){
+		if(OverSampleCounter<16){
+			OverSampleCounter++;
+		}else{
+			OverSampleCounter = 0;
+		}
+		if(OverSampleCounter == 8){
+			if(FilteredSignal == 1){
+				dbgflg = 1;
+			}else{
+				dbgflg = 0;
+			}
+		}
+//		if(SerialModeFlag == 1){
+//			HAL_GPIO_TogglePin(DebugOutput_GPIO_Port, DebugOutput_Pin);
+//			dbgflg = HAL_GPIO_ReadPin(DecodedOutput_GPIO_Port, DecodedOutput_Pin);
+//			if(StartFlag == 1){
 //				SerialSequenceReceived[SerialIndex] = dbg2;
 //				SerialIndex--;
 //				if(SerialIndex == 0){ ////don't stop at index=0, hasn't stored in array[0] yet
@@ -845,28 +872,28 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 //						SerialSequenceReceived[i] = 0;
 //					}
 //				}
-			}else if (StartFlag == 0){
-			//	StartFlag = StartSequenceCheck(dbgflg, SequenceFlags, SequenceIndex);
-				if(StartFlag == 1){
+//			}else if (StartFlag == 0){
+//			//	StartFlag = StartSequenceCheck(dbgflg, SequenceFlags, SequenceIndex);
+//				if(StartFlag == 1){
 //					tmp = __HAL_TIM_GetCounter(&htim1);
 //					__HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_2, tmp + EIGHT_TWO_MSDELAY);
 //					HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_2);
-					CollectFlag = 1;
-				}
-			}
-		}
+//					CollectFlag = 1;
+//				}
+//		
+//		}
 	}
 }
 
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
-	if(htim->Instance==TIM3){
-		HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_1);
-		HAL_TIM_Base_Start_IT(&htim5);	
-	}else if(htim->Instance == TIM1){
-		CollectFlag = 0;
-		HAL_TIM_OC_Stop_IT(&htim1, TIM_CHANNEL_2);
-		SequenceCheck();
-	}
+//	if(htim->Instance==TIM3){
+//		HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_1);
+//		HAL_TIM_Base_Start_IT(&htim5);	
+//	}else if(htim->Instance == TIM1){
+//		CollectFlag = 0;
+//		HAL_TIM_OC_Stop_IT(&htim1, TIM_CHANNEL_2);
+//		SequenceCheck();
+//	}
 }
 
 /* EdgeDetect
@@ -1025,6 +1052,23 @@ void SequenceCheck(void){
 	for(int i=0; i<80; i++){
 		PulseArray[i] = 0;
 	}
+}
+
+uint32_t IntegratorAdjust(uint32_t signal, uint32_t integrator){
+	
+	switch(signal){
+		case 0:
+			if(integrator >=5){
+				integrator -= 5;
+			}
+			break;
+		case 1:
+			if(integrator <= 27){
+				integrator += 3;
+			}
+			break;		
+	}
+	return integrator;
 }
 /* USER CODE END 4 */
 
