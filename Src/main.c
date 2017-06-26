@@ -75,8 +75,11 @@ uint32_t IntegratorValue;
 uint32_t ADCValue[1];
 
 uint32_t OverSampleCounter = 0;
+uint32_t SymbolCounter = 0;
 uint32_t OnesCounter = 0;
+uint32_t ZeroCounter = 0;
 uint32_t ZeroDetected = 0;
+uint32_t RUNONCEFLAG = 0;
 
 uint32_t CurrentConvertedValue;
 uint32_t PastConvertedValue;
@@ -182,9 +185,9 @@ int main(void)
 
   /* USER CODE BEGIN 2 */
 	HAL_ADC_Start_DMA(&hadc1, ADCValue, sizeof(uint16_t));
-	HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_3);
+	HAL_TIM_Base_Start(&htim2);
 	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
-	//HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+//	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
 //	HAL_TIM_Base_Start_IT(&htim5);
 
   /* USER CODE END 2 */
@@ -727,46 +730,41 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 				TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
 				TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);
 				FilteredSignal = PulseSymbolValidation(RiseTimestamp, FallTimestamp);
-				IntegratorValue = IntegratorAdjust(FilteredSignal, IntegratorValue);
-
+			//	IntegratorValue = IntegratorAdjust(FilteredSignal, IntegratorValue);
+				//HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, IntegratorValue);
 				if(SerialModeFlag == 0){
 					switch(FilteredSignal){
 						case 0:
-							ZeroDetected = 1;
 							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
-							if((OnesCounter != 0) && (ZeroDetected != 0)){
+							ZeroCounter++;
+							if(OnesCounter <= 12){
+								OnesCounter= 0;
+							}else if((OnesCounter > 16) && (ZeroCounter > 10)){
 								if((htim5.Instance->CR1 && TIM_CR1_CEN) == 0){
-									HAL_TIM_Base_Start_IT(&htim5);
+									//if(RUNONCEFLAG == 0){
+										HAL_TIM_Base_Start_IT(&htim5);
+										RUNONCEFLAG++;
+										OnesCounter = 0;
+										ZeroCounter = 0;
+									//}
 								}
 							}
-							OnesCounter = 0;
 							break;
 						case 1:
 							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
-							ZeroDetected = 0;
 							OnesCounter++;
+							ZeroCounter = 0;
+//							if((htim5.Instance->CR1 && TIM_CR1_CEN) == 0){
+//								HAL_TIM_Base_Start_IT(&htim5);
+//							}
 							break;
 					}
 				}
-//				PulseArray[PulseIndex] = FilteredSignal;
-//				if(PulseIndex < 70){
-//					PulseIndex++;
-//				}else{
-//					PulseIndex = 0;
-//				}
 				break;
-		}	
-		if(SerialModeFlag==1){
-			if((htim6.Instance->CR1 && TIM_CR1_CEN) == 0){
-				HAL_TIM_Base_Start_IT(&htim6);
-//				if((htim5.Instance->CR1 && TIM_CR1_CEN) == 0){
-//					HAL_TIM_Base_Start_IT(&htim5);
-//				}
-			}
 		}
 	}
 }
-
+			
 void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 
 	CurrentConvertedValue = ADCValue[0];
@@ -786,37 +784,7 @@ void HAL_ADC_ConvCpltCallback( ADC_HandleTypeDef* hadc){
 				break;			
 		}
 	}
-	PastConvertedValue = CurrentConvertedValue;
-//	
-//	if(EdgeDetectFlag){
-//		if(!(htim6.Instance->CR1 && TIM_CR1_CEN)){
-//			HAL_TIM_Base_Start_IT(&htim6);	
-//		}
-//		EdgeDetectFlag = 0;
-//		switch(EdgeFlag){
-//			case 2:
-//				if(IntegratorValue >= 680){
-//				}				
-//				break;
-//			case 1:
-//					IntegratorValue = 0;
-//				break;
-//			case 0:
-//					IntegratorValue = 4095;
-//				break;
-//		}
-//	}
-//	
-//	
-//	if(IntegratorValue > 2047){
-//		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
-//		SymbolReceived = 1;
-//	}else if(IntegratorValue <= 2047){
-//		HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
-//		SymbolReceived = 0;
-//	}
-//	
-//	
+	PastConvertedValue = CurrentConvertedValue;	
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
@@ -835,53 +803,42 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	uint32_t tmp = 0;
 	
-	if(htim->Instance == TIM6){
-		if(SerialModeFlag == 1){
-			dbg2 = FilteredSignal;
-			if(dbg2 == 1){
-				HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
-			}else if(dbg2 == 0){
-				HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
-			}
-		}		
-	}else if(htim->Instance == TIM5){
+	if(htim->Instance == TIM5){
 		if(OverSampleCounter<16){
 			OverSampleCounter++;
 		}else{
+			SymbolCounter++;
 			OverSampleCounter = 0;
 		}
 		if(OverSampleCounter == 8){
-			if(FilteredSignal == 1){
-				dbgflg = 1;
+			HAL_GPIO_TogglePin(DebugOutput_GPIO_Port, DebugOutput_Pin);
+//			if(FilteredSignal == 1){
+//				dbgflg = 1;
+//				//HAL_GPIO_WritePin(DebugOutput_GPIO_Port, DebugOutput_Pin, GPIO_PIN_SET);
+//			}else{
+//				dbgflg = 0;
+//				//HAL_GPIO_WritePin(DebugOutput_GPIO_Port, DebugOutput_Pin, GPIO_PIN_RESET);
+//			}
+			if(SerialIndex == 0){ 
+				SerialSequenceReceived[SerialIndex] = FilteredSignal;
+				SerialIndex = 7;
+				StartFlag = 0;
+				OutputSymbol();
+				while(HAL_TIM_Base_Stop_IT(&htim5) != HAL_OK);
+				for(int i = 0; i<7; i++){
+					SerialSequenceReceived[i] = 0;
+				}
+				OnesCounter = 0;
+				ZeroCounter = 0;
+				SymbolCounter = 0;
+				OverSampleCounter = 0;
 			}else{
-				dbgflg = 0;
+				SerialSequenceReceived[SerialIndex] = FilteredSignal;
+				SerialIndex--;
 			}
 		}
-//		if(SerialModeFlag == 1){
-//			HAL_GPIO_TogglePin(DebugOutput_GPIO_Port, DebugOutput_Pin);
-//			dbgflg = HAL_GPIO_ReadPin(DecodedOutput_GPIO_Port, DecodedOutput_Pin);
-//			if(StartFlag == 1){
-//				SerialSequenceReceived[SerialIndex] = dbg2;
-//				SerialIndex--;
-//				if(SerialIndex == 0){ ////don't stop at index=0, hasn't stored in array[0] yet
-//					//HAL_TIM_IC_Stop_IT(&htim4,TIM_CHANNEL_1);
-//					SerialIndex = 7;
-//					StartFlag = 0;
-//					OutputSymbol();
-//					for(int i = 0; i<7; i++){
-//						SerialSequenceReceived[i] = 0;
-//					}
-//				}
-//			}else if (StartFlag == 0){
-//			//	StartFlag = StartSequenceCheck(dbgflg, SequenceFlags, SequenceIndex);
-//				if(StartFlag == 1){
-//					tmp = __HAL_TIM_GetCounter(&htim1);
-//					__HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_2, tmp + EIGHT_TWO_MSDELAY);
-//					HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_2);
-//					CollectFlag = 1;
-//				}
-//		
-//		}
+			
+	
 	}
 }
 
@@ -892,7 +849,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
 //	}else if(htim->Instance == TIM1){
 //		CollectFlag = 0;
 //		HAL_TIM_OC_Stop_IT(&htim1, TIM_CHANNEL_2);
-//		SequenceCheck();
+//		//SequenceCheck();
 //	}
 }
 
@@ -948,123 +905,29 @@ void OutputSymbol (void){
 	uint8_t buffer[100];
 	uint8_t compressedsequence = 0;
 	
-	p = sprintf((char *)buffer, "TESTING\r\n");
-	HAL_UART_Transmit(&huart2, buffer, p,50);
+//	p = sprintf((char *)buffer, "TESTING\r\n");
+//	HAL_UART_Transmit(&huart2, buffer, p,50);
 
 	for(int i = 0; i<8; i++){
 		compressedsequence += SerialSequenceReceived[i] << (7-i);
 	}
 	p = sprintf((char *)buffer, "%c \n\r", compressedsequence);
-//	HAL_UART_Transmit(&huart2, buffer, p,50);
+	dbg2 = HAL_UART_Transmit(&huart2, buffer, p,50);
 	
 	//HAL_TIM_IC_Start_IT(&htim4,TIM_CHANNEL_1);
-}
-
-/*
- * StartSequenceCheck
- *
- * Takes: last_symbol = logic 1 0r 0 from decoded string
- *				received_ptr = pointer to a variable where each bit indicates a the sequence of received values
- * 				index = index indicating which bit in *received_ptr is being written to 
- * 
- * Returns: flag = indicates whether a start sequence has been decoded
- *
- *
- * Description
- * 			Looks for the binary pattern 1100 in the deocoded stream to indicate when a start has been indicated
- * 			Uses index to check individual bits in a variable, and resets the index sequence if pattern doesn't
- * 			match at any point.
- *
- * Example
- *			StartFlag = StartSequenceCheck(SymbolReceived, SequenceFlags, SequenceIndex);
- *
- * Usage note
- * 		Invoke this at data sampling frequency, not ADC frequency. 
- *
- */
-uint32_t StartSequenceCheck(uint32_t last_symbol, uint32_t received_ptr, uint32_t index){
-	uint8_t flag = 0;
-	
-	//dbg2 = SymbolReceived;
-	if(SequenceIndex == 0){
-		SequenceFlags += last_symbol << (3 - SequenceIndex);
-		SequenceIndex += 1;		
-	}else if(SequenceIndex == 1){
-		if(SequenceFlags == 0x8){
-			SequenceFlags += last_symbol << (3 - SequenceIndex);
-			SequenceIndex += 1;
-		}else{
-			SequenceFlags = 0;
-			SequenceIndex = 0;
-		}
-	}else if(SequenceIndex == 2){
-		if(SequenceFlags == 0xc){
-			SequenceFlags += last_symbol << (3 - SequenceIndex);
-			SequenceIndex += 1;
-		}else{
-			SequenceFlags = 0;
-			SequenceIndex = 0;
-		}
-	}else if(SequenceIndex == 3){
-		if(SequenceFlags == 0xc){
-			SequenceFlags += last_symbol << (3 - SequenceIndex);
-			SequenceIndex += 1;
-		}else{
-			SequenceFlags = 0;				
-			SequenceIndex = 0;
-		}
-	}
-	if((SequenceFlags == 0xc) && (SequenceIndex == 3)){
-		SequenceIndex = 0;
-		SequenceFlags = 0;
-		flag = 1;
-	}
-	
-	return flag;
-}
-
-void SequenceCheck(void){
-
-	
-	while(index_seq <= PulseIndex){
-		ValueCheck = PulseArray[index_seq];
-		while(ValueCheck == PulseArray[index_seq]){
-			index_seq++;
-			CountEntries++;
-		}
-		switch(ValueCheck){
-			case 0:
-				num = CountEntries / 6; 
-				break;
-			case 1:
-				num = CountEntries / 10; 
-				break;					
-		}
-		CountEntries = 0;
-		SymbolIndex += num;
-		for(int n = 0; n < num; n++){
-			RecoveredSignal += ValueCheck << (SymbolIndex - n - 1);
-		}
-	}
-	PulseIndex = 0;
-	CountEntries = 0;
-	SymbolIndex = 0;
-	for(int i=0; i<80; i++){
-		PulseArray[i] = 0;
-	}
 }
 
 uint32_t IntegratorAdjust(uint32_t signal, uint32_t integrator){
 	
 	switch(signal){
 		case 0:
-			if(integrator >=5){
-				integrator -= 5;
+			if(integrator >= 1360){
+				integrator -= 1360;
 			}
 			break;
 		case 1:
-			if(integrator <= 27){
-				integrator += 3;
+			if(integrator <= 3672){
+				integrator += 408;
 			}
 			break;		
 	}
