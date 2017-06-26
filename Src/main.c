@@ -110,7 +110,7 @@ uint32_t SequenceFlags;
 uint32_t SequenceIndex;
 uint32_t StartFlag = 0;
 uint8_t SerialSequenceReceived[8];
-uint32_t SerialIndex = 7;
+uint32_t SerialIndex = 8;
 
 
 /* USER CODE END PV */
@@ -555,7 +555,7 @@ static void MX_TIM5_Init(void)
   htim5.Instance = TIM5;
   htim5.Init.Prescaler = 0;
   htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim5.Init.Period = 3523;
+  htim5.Init.Period = 4024;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
   {
@@ -737,9 +737,9 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 						case 0:
 							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
 							ZeroCounter++;
-							if(OnesCounter <= 12){
+							if(OnesCounter <= 13){
 								OnesCounter= 0;
-							}else if((OnesCounter > 16) && (ZeroCounter > 10)){
+							}else if((OnesCounter > 14) && (ZeroCounter > 14)){
 								if((htim5.Instance->CR1 && TIM_CR1_CEN) == 0){
 									//if(RUNONCEFLAG == 0){
 										HAL_TIM_Base_Start_IT(&htim5);
@@ -804,41 +804,38 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	uint32_t tmp = 0;
 	
 	if(htim->Instance == TIM5){
-		if(OverSampleCounter<16){
+		if(OverSampleCounter<15){
 			OverSampleCounter++;
 		}else{
 			SymbolCounter++;
 			OverSampleCounter = 0;
 		}
-		if(OverSampleCounter == 8){
+		if(OverSampleCounter == 14){
 			HAL_GPIO_TogglePin(DebugOutput_GPIO_Port, DebugOutput_Pin);
 //			if(FilteredSignal == 1){
 //				dbgflg = 1;
-//				//HAL_GPIO_WritePin(DebugOutput_GPIO_Port, DebugOutput_Pin, GPIO_PIN_SET);
+//				HAL_GPIO_WritePin(DebugOutput_GPIO_Port, DebugOutput_Pin, GPIO_PIN_SET);
 //			}else{
 //				dbgflg = 0;
-//				//HAL_GPIO_WritePin(DebugOutput_GPIO_Port, DebugOutput_Pin, GPIO_PIN_RESET);
+//				HAL_GPIO_WritePin(DebugOutput_GPIO_Port, DebugOutput_Pin, GPIO_PIN_RESET);
 //			}
+			SerialSequenceReceived[SerialIndex-1] = FilteredSignal;
+			SerialIndex--;
 			if(SerialIndex == 0){ 
-				SerialSequenceReceived[SerialIndex] = FilteredSignal;
-				SerialIndex = 7;
+				//SerialSequenceReceived[SerialIndex] = FilteredSignal;
+				SerialIndex = 8;
 				StartFlag = 0;
-				OutputSymbol();
-				while(HAL_TIM_Base_Stop_IT(&htim5) != HAL_OK);
-				for(int i = 0; i<7; i++){
-					SerialSequenceReceived[i] = 0;
-				}
+				//OutputSymbol();
 				OnesCounter = 0;
 				ZeroCounter = 0;
 				SymbolCounter = 0;
 				OverSampleCounter = 0;
-			}else{
-				SerialSequenceReceived[SerialIndex] = FilteredSignal;
-				SerialIndex--;
+				while(HAL_TIM_Base_Stop_IT(&htim5) != HAL_OK);
+				for(int i = 0; i<8; i++){
+					SerialSequenceReceived[i] = 0;
+				}
 			}
 		}
-			
-	
 	}
 }
 
@@ -911,7 +908,7 @@ void OutputSymbol (void){
 	for(int i = 0; i<8; i++){
 		compressedsequence += SerialSequenceReceived[i] << (7-i);
 	}
-	p = sprintf((char *)buffer, "%c \n\r", compressedsequence);
+	p = sprintf((char *)buffer, "%c", compressedsequence);
 	dbg2 = HAL_UART_Transmit(&huart2, buffer, p,50);
 	
 	//HAL_TIM_IC_Start_IT(&htim4,TIM_CHANNEL_1);
