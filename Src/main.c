@@ -825,12 +825,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 				//SerialSequenceReceived[SerialIndex] = FilteredSignal;
 				SerialIndex = 8;
 				StartFlag = 0;
-				//OutputSymbol();
 				OnesCounter = 0;
 				ZeroCounter = 0;
 				SymbolCounter = 0;
 				OverSampleCounter = 0;
 				while(HAL_TIM_Base_Stop_IT(&htim5) != HAL_OK);
+				OutputSymbol();
 				for(int i = 0; i<8; i++){
 					SerialSequenceReceived[i] = 0;
 				}
@@ -908,8 +908,13 @@ void OutputSymbol (void){
 	for(int i = 0; i<8; i++){
 		compressedsequence += SerialSequenceReceived[i] << (7-i);
 	}
-	p = sprintf((char *)buffer, "%c", compressedsequence);
-	dbg2 = HAL_UART_Transmit(&huart2, buffer, p,50);
+	if(compressedsequence == 13){
+		p = sprintf((char *)buffer, "%c \n", compressedsequence);
+		dbg2 = HAL_UART_Transmit(&huart2, buffer, p,50);
+	}else{
+		p = sprintf((char *)buffer, "%c", compressedsequence);
+		dbg2 = HAL_UART_Transmit(&huart2, buffer, p,50);
+	}
 	
 	//HAL_TIM_IC_Start_IT(&htim4,TIM_CHANNEL_1);
 }
