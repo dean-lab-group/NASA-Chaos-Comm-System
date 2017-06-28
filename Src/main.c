@@ -54,7 +54,7 @@ UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-static int TestArray[48] = {1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0};
+static int TestArray[18] = {1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0};   //10 ones, 6 zeroes.	
 	//To prevent transients on the oscillator, multiple copies of the same symbol must be sent in a row.
 	//This sequency is actually 1010110010
 int ArrLen = sizeof(TestArray) / sizeof(int);
@@ -203,6 +203,7 @@ void ReadCustomData(void){
 	HAL_UART_Transmit(&huart2, buffer, p,50);
 	HAL_UART_Receive(&huart2, recbuff, 2, 10000);
 	p = 0;
+	//recbuff[0] = ;
 	for(i=0;i<8;i++){
 		sendbuff[i] = (recbuff[0] & (0x1 << i));
 		sendbuff[i] = sendbuff[i] >> i; 
@@ -210,24 +211,24 @@ void ReadCustomData(void){
 	}
 			
 	for(int z = 0; z<2; z++){
-		for(int j=0;j<12;j++){ //Flag a start to the sequence
+		for(int j=0;j<8;j++){ //Flag a start to the sequence
 					while(!togglecheck){
 					}
 					HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);	
 					HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
 					togglecheck = 0;
 				}
-		HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);
+		//HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);
 	}
 	for(int z = 0; z<2; z++){
-		for(int j=0;j<12;j++){ //Flag a start to the sequence
+		for(int j=0;j<8;j++){ //Flag a start to the sequence
 					while(!togglecheck){
 					}
 					HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);	
 					HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 					togglecheck = 0;
 				}
-		HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);
+		//HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);
 	}
 				
 				
