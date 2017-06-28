@@ -40,6 +40,7 @@
 #define LOWCOUNT 1
 #define HIGHEDGE 3220
 #define LOWEDGE 1610
+
 /* USER CODE END Includes */
 
 /* Private define ------------------------------------------------------------*/

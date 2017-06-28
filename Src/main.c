@@ -35,6 +35,7 @@
 #include "ManchesterEncode.h"
 #include "MX_INIT_FUNC.h"
 
+
 /* USER CODE BEGIN Includes */
 #define OFFSET 30
 /* USER CODE END Includes */
@@ -54,7 +55,7 @@ UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-static int TestArray[18] = {1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0};   //10 ones, 6 zeroes.	
+static int TestArray[ONES_REPEATED + ZEROES_REPEATED]; 
 	//To prevent transients on the oscillator, multiple copies of the same symbol must be sent in a row.
 	//This sequency is actually 1010110010
 int ArrLen = sizeof(TestArray) / sizeof(int);
@@ -103,7 +104,14 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+	uint16_t testindex = 0;
+	uint16_t tmp_tot = ONES_REPEATED + ZEROES_REPEATED;
+	for(testindex=0; testindex < ONES_REPEATED; testindex++){
+		TestArray[testindex] = 1;		
+	}
+	for(testindex = ONES_REPEATED; testindex<tmp_tot; testindex++){
+		TestArray[testindex] = 0;
+	}
   /* USER CODE END 1 */
 
   /* MCU Configuration----------------------------------------------------------*/

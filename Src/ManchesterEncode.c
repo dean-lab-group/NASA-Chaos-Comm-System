@@ -7,7 +7,7 @@ extern volatile int togglecheck;
 void ManchesterOne(void){
 int j = 0;
 	
-	for(j=0;j<12;j++){
+	for(j=0;j<ONES_REPEATED;j++){
 		while(togglecheck == 0){
 		}
 		HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);	
@@ -30,7 +30,7 @@ int j = 0;
 void ManchesterZero(void){
 	int j = 0;
 	
-	for(j=0;j<6;j++){
+	for(j=0;j<ZEROES_REPEATED;j++){
 		while(togglecheck == 0){
 		}
 		HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);
