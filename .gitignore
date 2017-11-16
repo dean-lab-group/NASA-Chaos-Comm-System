@@ -1,4 +1,5 @@
 *.andre
 *.azm0043
-
-BackEndSerial
+.idea/*
+.idea
+*.pyc
