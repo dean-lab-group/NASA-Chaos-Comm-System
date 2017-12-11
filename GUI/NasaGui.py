@@ -31,9 +31,8 @@ class CommGui(object):
             else:
                 self.ser = serial.Serial(self.serial_port, timeout=1)
         except serial.serialutil.SerialException as e:
-            msg = "Couldn't connect to serial device!"
+            msg = "Couldn't connect to serial device! " + str(e)
             print(msg)
-            # eg.msgbox(msg)
             exit(-1)
 
         while True:
