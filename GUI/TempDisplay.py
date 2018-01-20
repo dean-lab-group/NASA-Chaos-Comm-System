@@ -4,15 +4,16 @@ import Tkinter
 from Tkinter import Tk, BOTH, Label
 import threading
 import tkFont
+from serial_setup import SerialSetup
 
-import serial
+from settings import Settings
+my_set = Settings()
 
-from GUI import settings
+temperature = my_set.init_temp
 
-temperature = "NA"
 top = Tk()
-top.geometry("600x600")
-top.title("Sensor Temperature")
+top.geometry(my_set.window_geometry)
+top.title(my_set.window_title)
 myLabel = Label(top, text=temperature)
 myLabel.pack()
 
@@ -25,7 +26,7 @@ class Looping(object):
         self.B_stop = Tkinter.Button(top, text="Stop", command=self.button_stop)
         self.B_stop.pack(fill=BOTH, expand=0)
         self.isRunning = True
-        self.ser = serial.Serial(settings.serial_port, 9600, timeout=1)
+        self.s = SerialSetup()
         self.temperature = None
         self.alpha = 0.5
 
