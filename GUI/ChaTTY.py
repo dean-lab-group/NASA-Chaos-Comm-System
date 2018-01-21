@@ -1,6 +1,5 @@
 # coding=utf-8
 from threading import Thread
-from serial import Serial
 
 
 class Receiver(Thread):
@@ -11,7 +10,7 @@ class Receiver(Thread):
     def run(self):
         text = ""
         while (text != "exit\n"):
-            text = serialPort.readline()
+            text = self.serialPort.readline()
             print ("\n Machine 1: " + text)
         self.serialPort.close()
 
@@ -23,7 +22,7 @@ class Sender(Thread):
 
     def run(self):
         text = ""
-        while (text != "exit\n"):
+        while text != "exit\n":
             text = raw_input(">>") + "\n"
             self.serialPort.write(text)
         self.serialPort.close()
@@ -33,7 +32,7 @@ class ChaTTY(object):
     def __init__(self, serial_port, *args, **kwargs):
         self.serial_port = serial_port
         try:
-            self.serial_port = Serial(serial_port)
+            self.serial_port = serial_port
         except Exception as e:
             print e
             exit(-1)

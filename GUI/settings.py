@@ -9,10 +9,11 @@ class Settings(object):
         self.serial_port_rate = 9600
         self.data_delim = '\x00'
         self.title = "Chaos Communication GUI"
-
+        self.serial_ignore_list = 'bluetooth|iphone|dopsie'
         self.components = dict(send="Send File",
                                receive="Receive File",
                                chat="Open Chat",
+                               connect="Connect to serial",
                                exit="Exit"
                                )
 

@@ -4,7 +4,7 @@ import Tkinter
 from Tkinter import Tk, BOTH, Label
 import threading
 import tkFont
-from serial_setup import SerialSetup
+from serial_setup import SuperSerial
 
 from settings import Settings
 my_set = Settings()
@@ -26,7 +26,7 @@ class Looping(object):
         self.B_stop = Tkinter.Button(top, text="Stop", command=self.button_stop)
         self.B_stop.pack(fill=BOTH, expand=0)
         self.isRunning = True
-        self.s = SerialSetup()
+        self.s = SuperSerial()
         self.temperature = None
         self.alpha = 0.5
 
