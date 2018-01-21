@@ -13,7 +13,7 @@ class FileSender(object):
         self.ser = serial_obj
 
     def send_file(self, file_path):
-        if not self.connected:
+        if not self.ser.is_open():
             self.ser.open()
         # Compile string and send data.
         print "Sending ", file_path
@@ -29,8 +29,8 @@ class FileSender(object):
             eg.msgbox(msg='File sent', title='Data Sent', ok_button='(OK)')
 
     def receive_file(self, file_path):
-        if not self.connected:
-            self.ser.open()
+        # if not self.ser.is_open():
+        #     self.ser.open()
         # Puts program in receive mode, waiting for data on serial line.
         encoded_data = self.ser.read_until(terminator=self.settings.data_delim * 2).rstrip(self.settings.data_delim * 2)
         # We split the incoming data into two parts. The '1' below is the maxsplit parameter which means we're splitting
