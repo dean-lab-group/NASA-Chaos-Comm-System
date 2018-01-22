@@ -31,7 +31,7 @@ class FileSender(object):
             for my_byte in tqdm(file_data, total=data_size, unit='bytes'):
                 self.ser.write(my_byte)
                 self.ser.write('\n')
-                sleep(0.25)
+                sleep(0.1)
             #eg.msgbox(msg='File sent', title='Data Sent', ok_button='(OK)')
 
     def receive_file(self, file_path):
@@ -80,11 +80,11 @@ if __name__ == '__main__':
     mode = sys.argv[1]
     filename = sys.argv[2]
     if mode == '--receive':
-        receiver = SuperSerial(port='/dev/tty.usbserial-FTG96HDJ')
+        receiver = SuperSerial() #port='/dev/tty.usbserial-FTG96HDJ')
         fs = FileSender(receiver)
         fs.receive_file(filename)
     elif mode == '--send':
-        sender = SuperSerial(port='/dev/tty.usbmodem1413')
+        sender = SuperSerial() #port='/dev/tty.usbmodem1413')
         fs = FileSender(sender)
         fs.send_file(filename)
     else:
