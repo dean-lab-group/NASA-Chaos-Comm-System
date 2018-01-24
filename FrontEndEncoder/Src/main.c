@@ -55,7 +55,7 @@ UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-static int TestArray[ONES_REPEATED + ZEROES_REPEATED]; 
+static int TestArray[ONES_REPEATED + ZEROES_REPEATED];
 	//To prevent transients on the oscillator, multiple copies of the same symbol must be sent in a row.
 	//This sequency is actually 1010110010
 int ArrLen = sizeof(TestArray) / sizeof(int);
@@ -147,6 +147,8 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+		ReadCustomData();
+		
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
@@ -167,7 +169,7 @@ int main(void)
 			default :
 				break;
 		}
-	}	
+	}
   /* USER CODE END 3 */
 
 }
@@ -177,25 +179,25 @@ int main(void)
 
 /* USER CODE BEGIN 4 */
 void TestCaseOutput(void){
-	
+
 	if(NextSymbol == 85){ //data validation for the initial transmission
 		NextSymbol = TestArray[ArrInd];  //load the first transmission symbol in the array
 		ArrInd++;
 	}
-	
+
 	if(NextSymbol == 1){
-		HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);	
+		HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);
 		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
 	}else if(NextSymbol == 0){
 		HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);
 	}
-	
+
 	if((ArrInd + 1) <= (ArrLen)){ //prevent ArrInd going out of bounds
 		CurrentSymbol = NextSymbol;
 		NextSymbol = TestArray[ArrInd];
 		ArrInd++;
 		if(ArrInd == ArrLen){
-			ArrInd = 0;		
+			ArrInd = 0;
 		}
 	}
 	togglecheck = 0; //clear flag
@@ -314,7 +316,7 @@ void HAL_TIM_IC_CaptureCallback( TIM_HandleTypeDef* htim ){
 	}
 }
 
-void HAL_TIM_OC_DelayElapsedCallback( TIM_HandleTypeDef* htim ){ 
+void HAL_TIM_OC_DelayElapsedCallback( TIM_HandleTypeDef* htim ){
 	HAL_TIM_OC_Stop_IT(htim, TIM_CHANNEL_1);
 	if(EntryModeFlag){
 		CaseNumber = 1;
@@ -326,7 +328,7 @@ void HAL_TIM_OC_DelayElapsedCallback( TIM_HandleTypeDef* htim ){
 		//HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_1);
 		StartFlag = 1;
 	}
-}	
+}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	
