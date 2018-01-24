@@ -4,8 +4,9 @@ import re
 
 import serial
 import sys
-
+import serial.tools.list_ports
 from settings import Settings
+
 
 
 class SuperSerial(serial.Serial):
@@ -24,29 +25,14 @@ class SuperSerial(serial.Serial):
 
     @property
     def ports(self):
-        if sys.platform == 'darwin':
-            temp_list = glob.glob('/dev/tty.[A-Za-z]*')
-        elif sys.platform == 'linux':
-            temp_list = glob.glob('/dev/tty.[A-Za-z]*')
-        else:
-            # TODO: How do we find available Windows COM ports?
-            temp_list = None
-
         result = []
-        for a_port in temp_list:
-            try:
-                if re.search(self.settings.serial_ignore_list, a_port, re.IGNORECASE):
-                    #print("Ignoring" + a_port)
-                    continue
-
-                s = serial.Serial(a_port)
-                if s.readable():
-                    s.close()
-                    result.append(a_port)
-            except serial.SerialException:
-                pass
+        for n, (portname, desc, hwid) in enumerate(sorted(serial.tools.list_ports.comports())):
+            if re.search(self.settings.serial_ignore_list, portname, re.IGNORECASE):
+                #print("Ignoring" + a_port)
+                continue
+            else:
+                result.append(portname)
         return result
-
 
 if __name__ == '__main__':
     s = SuperSerial()
