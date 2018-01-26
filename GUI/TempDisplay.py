@@ -4,6 +4,9 @@ import Tkinter
 from Tkinter import Tk, BOTH, Label
 import threading
 import tkFont
+
+import struct
+
 from serial_setup import SuperSerial
 
 from settings import Settings
@@ -17,6 +20,15 @@ top.geometry(my_set.window_geometry)
 top.title(my_set.window_title)
 myLabel = Label(top, text=temperature)
 myLabel.pack()
+
+
+class Frame(object):
+    def __init__(self):
+        self.format = ''
+        self.buffer = ''
+
+    def _decode_frame(self):
+        struct.unpack(self.format, self.buffer)
 
 
 class Looping(object):
@@ -69,11 +81,11 @@ class Looping(object):
                 temperature = int(temperature.strip())
                 #temperature = self.convert_temp(temperature)
 
-                # Added this to intialize the average temperature close to the value its reporting so that it will
-                # take less time to stablilize.
+                # Added this to initialize the average temperature close to the value its reporting so that it will
+                # take less time to stabilize.
                 if not self.temperature:
                     self.temperature = temperature
-                temperature = self.ma(temperature)
+                # temperature = self.ma(temperature)
                 self.temperature = temperature
                 myLabel.config(text="%0.2f deg C" % temperature)
             except ValueError as e:
