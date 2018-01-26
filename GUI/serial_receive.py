@@ -1,23 +1,28 @@
 import string
 
+import sys
+
 from parse_frame import Frame
 from serial_setup import SuperSerial
 
-receiver = SuperSerial(port='COM4')
+if sys.platform == 'darwin':
+    MY_PORT = '/dev/tty.usbmodem1423'
+else:
+    MY_PORT = 'COM4'
+
+receiver = SuperSerial(port=MY_PORT)
 #fh = open('test_data_received.txt', 'w')
-#fr = Frame(receiver)
+fr = Frame(receiver)
+
+fr.DATA_DELIM = "%s%c%s" % ('\n', 0, '\n')
+fr.FRAME_END = bytearray("%c%s%c%s" % (0, '\n', 0, '\n'))
 while True:
     try:
-        for i in xrange(20):
-            my_in = receiver.read()
-            if my_in in string.printable:
-                print my_in,
-            else:
-                print repr(my_in),
-        print
-        #frame_array = fr.frame_data_array
-        #print frame_array
-        #print repr(recv)
+        frame_array = fr.frame_data_array
+        if frame_array:
+            sys.stdout.write(frame_array)
+        else:
+            sys.stdout.write('*')
         #fh.write(recv)
         #fh.flush()
     except KeyboardInterrupt:

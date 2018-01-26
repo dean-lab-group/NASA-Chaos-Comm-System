@@ -6,7 +6,9 @@ from tqdm import tqdm
 from serial_setup import SuperSerial
 from settings import Settings
 
+
 class SoftFrame(object):
+    pass
 
 
 class FileSender(object):
@@ -24,14 +26,14 @@ class FileSender(object):
         print "Sending ", file_path
         with open(file_path, 'rb') as fh:
             file_data = fh.read()
-            #checksum = crc32(file_data)
-            #data = file_data + self.settings.data_delim + str(checksum) + self.settings.data_delim * 2
-            #cobs_encoded = cobs.encode(data)
-            #cobs_newlined = [x+'\n' for x in cobs_encoded]
-            #data_size = len(cobs_encoded)
+            # checksum = crc32(file_data)
+            # data = file_data + self.settings.data_delim + str(checksum) + self.settings.data_delim * 2
+            # cobs_encoded = cobs.encode(data)
+            # cobs_newlined = [x+'\n' for x in cobs_encoded]
+            # data_size = len(cobs_encoded)
             data_size = len(file_data)
-            #print "File size:", data_size, "bytes"
-            #for my_byte in tqdm(cobs_encoded, total=data_size, unit='bytes'):
+            # print "File size:", data_size, "bytes"
+            # for my_byte in tqdm(cobs_encoded, total=data_size, unit='bytes'):
             if not self.progress:
                 print "Disabling progress meter."
                 tqdm.disable = True
@@ -39,7 +41,7 @@ class FileSender(object):
                 self.ser.write(my_byte)
                 self.ser.write('\n')
                 sleep(self.SEND_DELAY)
-            #eg.msgbox(msg='File sent', title='Data Sent', ok_button='(OK)')
+            # eg.msgbox(msg='File sent', title='Data Sent', ok_button='(OK)')
             print
 
     def receive_file(self, file_path):
@@ -53,18 +55,18 @@ class FileSender(object):
         print "Terminator:", [ord(x) for x in terminator]
         while True:
             c = self.ser.read(1)
-            print(c+",",)
+            print(c + ",",)
             if c:
                 line += c
                 if line[-lenterm:] == terminator:
                     break
-                #if size is not None and len(line) >= size:
+                # if size is not None and len(line) >= size:
                 #    break
             else:
                 break
-            #if timeout.expired():
+            # if timeout.expired():
             #    break
-        #return bytes(line)
+        # return bytes(line)
         #
         exit()
         serial_data = self.ser.read_until(terminator=self.settings.data_delim * 2)
@@ -85,14 +87,15 @@ class FileSender(object):
 
 if __name__ == '__main__':
     import sys
+
     mode = sys.argv[1]
     filename = sys.argv[2]
     if mode == '--receive':
-        receiver = SuperSerial() #port='/dev/tty.usbserial-FTG96HDJ')
+        receiver = SuperSerial()  # port='/dev/tty.usbserial-FTG96HDJ')
         fs = FileSender(receiver)
         fs.receive_file(filename)
     elif mode == '--send':
-        sender = SuperSerial(port='COM5') #port='/dev/tty.usbmodem1413')
+        sender = SuperSerial(port='COM5')  # port='/dev/tty.usbmodem1413')
         fs = FileSender(sender)
         fs.send_file(filename)
     else:

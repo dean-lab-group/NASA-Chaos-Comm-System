@@ -1,4 +1,5 @@
 import struct
+from collections import OrderedDict
 
 from serial_setup import SuperSerial
 
@@ -18,9 +19,18 @@ class Frame(object):
 
     def _decode_frame(self):
         buf = self.s.read_until(self.FRAME_END)
-        # The repr() function here prints the escape sequence and is useful for troubleshooting.
-        # return repr(buf)
-        return buf.split(self.DATA_DELIM)[self.DATA_BEGIN:self.DATA_END]
+        frame = buf.split(self.DATA_DELIM)[self.DATA_BEGIN:self.DATA_END]
+        # We should only receive three elements in each received array. More than three indicates corrupt data.
+        if len(frame) == 3:
+            # We remove duplicates from the array of three. If all three are not the same, the data is corrupt.
+            if len(list(OrderedDict.fromkeys(frame))) == 1:
+                return frame[0]
+            else:
+                pass
+                #print "Corrupt data", frame
+        else:
+            pass
+            #print "Corrupt data", frame
 
     @property
     def frame_data_array(self):
