@@ -41,7 +41,7 @@
 
 /* USER CODE BEGIN Includes */
 //#include "extern_declare.h"
-#define ZEROPULSE 3400
+#define ZEROPULSE 3300
 #define SAMPLE_DELAY 2550
 #define EIGHT_TWO_MSDELAY 8200
 #define INPUT_RISE 'R'
