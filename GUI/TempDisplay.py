@@ -5,11 +5,10 @@ from Tkinter import Tk, BOTH, Label
 import threading
 import tkFont
 
-import struct
-
 from serial_setup import SuperSerial
-
+from parse_frame import Frame
 from settings import Settings
+from collections import OrderedDict
 
 my_set = Settings()
 
@@ -22,80 +21,72 @@ myLabel = Label(top, text=temperature)
 myLabel.pack()
 
 
-class Frame(object):
-    def __init__(self):
-        self.format = ''
-        self.buffer = ''
-
-    def _decode_frame(self):
-        struct.unpack(self.format, self.buffer)
-
-
 class Looping(object):
     def __init__(self):
         # my_font = tkFont.Font(family='Helvetica', size=100, weight='bold')
+        self.stop_threads = threading.Event()
+        self.t = None
         self.B_start = Tkinter.Button(top, text="Start", command=self.button_start)
         self.B_start.pack(fill=BOTH, expand=0)
         self.B_stop = Tkinter.Button(top, text="Stop", command=self.button_stop)
         self.B_stop.pack(fill=BOTH, expand=0)
         self.isRunning = True
         self.s = SuperSerial()
+        self.frame = Frame(self.s)
         self.temperature = None
-        self.alpha = 0.5
+        self.alpha = 0.1
 
-    def isConnected(self):
+    def is_connected(self):
         return self.s.is_open()
 
-    @staticmethod
-    def button_start():
+    def button_start(self):
         l.isRunning = True
-        t = threading.Thread(target=l.get_temperature)
-        t.start()
+        self.t = threading.Thread(target=l.loop_temps)
+        self.t.start()
 
-    def ma(self, new_temp):
+    def loop_temps(self):
+        while not self.stop_threads.is_set():
+            self._get_temperature()
+
+    def _moving_average(self, new_temp):
+        # Moving Average function
         ma_temp = self.alpha * new_temp + (1 - self.alpha) * self.temperature
-        print ma_temp
         return ma_temp
 
-    def convert_temp(self, temperature_int):
-        #print "temp_int", temperature_int
+    @staticmethod
+    def _convert_temp(temperature_int):
         temp_c = (3.3 * temperature_int / 255.0) / 0.01
-        #print temp_c
         return temp_c
 
-    def get_temperature(self):
+    def _get_temperature(self):
         global temperature
-        while self.isConnected:
-            if not self.s.is_open:
-                self.s.open()
-            while True:
-                temp = self.s.read()
-                print temp.strip()
-                temperature += temp
-            exit()
-            print "-->%s<--" % temperature.strip()
-            # for num, char in enumerate(temperature):
-            #     print "Serial Input (%d): %s, %d --length: %d" % (num, char, ord(char), len(temperature))
+        if not self.s.is_open:
+            self.s.open()
+        temperature = list(OrderedDict.fromkeys(self.frame.frame_data_array))
+        if len(temperature) != 1:
+            print "Received data corrupt"
             self.s.close()
-            try:
-                temperature = int(temperature.strip())
-                #temperature = self.convert_temp(temperature)
+        try:
+            temperature = int(temperature[0])
+            temperature = self._convert_temp(temperature)
 
-                # Added this to initialize the average temperature close to the value its reporting so that it will
-                # take less time to stabilize.
-                if not self.temperature:
-                    self.temperature = temperature
-                # temperature = self.ma(temperature)
+            # Added this to initialize the average temperature close to the value its reporting so that it will
+            # take less time to stabilize.
+            if not self.temperature:
                 self.temperature = temperature
-                myLabel.config(text="%0.2f deg C" % temperature)
-            except ValueError as e:
-                pass
-                # print ">>"+temperature+"<<", e
-        else:
-            print "Not connected to the communications system."
+                temperature = self._moving_average(temperature)
+            self.temperature = temperature
+
+            myLabel.config(text="%0.2f deg C" % temperature)
+        except ValueError as e:
+            pass
+            # print ">>"+temperature+"<<", e
 
     def button_stop(self):
+        self.stop_threads.set()
         l.isRunning = False
+        self.t.join(timeout=1)
+        self.t = None
         exit()
 
 

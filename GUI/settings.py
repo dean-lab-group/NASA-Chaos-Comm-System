@@ -3,7 +3,7 @@
 class Settings(object):
     def __init__(self):
         self.window_title = "Sensor Temperature"
-        self.window_geometry = "600x600"
+        self.window_geometry = "300x80"
         self.init_temp = 'NA'
         self.logo = 'NASA-logo.gif'
         self.serial_port_rate = 9600
