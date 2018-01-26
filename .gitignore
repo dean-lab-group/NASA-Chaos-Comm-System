@@ -11,3 +11,8 @@ venv/*
 *.axf
 *.o
 *.crf
+*.admin
+*.uvoptx
+*.axf
+*.o
+*.crf

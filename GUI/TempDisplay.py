@@ -34,7 +34,7 @@ class Looping(object):
         self.s = SuperSerial()
         self.frame = Frame(self.s)
         self.temperature = None
-        self.alpha = 0.1
+        self.alpha = 0.5
 
     def is_connected(self):
         return self.s.is_open()

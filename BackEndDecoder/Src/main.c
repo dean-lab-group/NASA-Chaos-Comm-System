@@ -41,7 +41,7 @@
 
 /* USER CODE BEGIN Includes */
 //#include "extern_declare.h"
-#define ZEROPULSE 3777
+#define ZEROPULSE 3400
 #define SAMPLE_DELAY 2550
 #define EIGHT_TWO_MSDELAY 8200
 #define INPUT_RISE 'R'
@@ -729,7 +729,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 						case 0:
 							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
 							ZeroCounter++;
-							if(OnesCounter <= 13){ 
+							if(OnesCounter <= 12){ 
 								OnesCounter= 0;
 							}else if((OnesCounter > 14) && (ZeroCounter > 12)){ //counts up how many ONE pulses from matched filter and ZERO pulses after to determine start sequence
 								if((htim5.Instance->CR1 && TIM_CR1_CEN) == 0){
@@ -890,10 +890,10 @@ void OutputSymbol (void){
 		compressedsequence += SerialSequenceReceived[i] << (7-i);
 	}
 	if(compressedsequence == 13){	
-		p = sprintf((char *)buffer, "%c \n", compressedsequence);
+		p = sprintf((char *)buffer, "%c\n", compressedsequence);
 		dbg2 = HAL_UART_Transmit(&huart2, buffer, p,50);
 	}else{
-		p = sprintf((char *)buffer, "%c", compressedsequence);
+		p = sprintf((char *)buffer, "%c\n", compressedsequence);
 		dbg2 = HAL_UART_Transmit(&huart2, buffer, p,50);
 	}
 	
