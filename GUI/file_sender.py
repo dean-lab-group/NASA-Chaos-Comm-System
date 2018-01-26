@@ -6,12 +6,16 @@ from tqdm import tqdm
 from serial_setup import SuperSerial
 from settings import Settings
 
+class SoftFrame(object):
+
 
 class FileSender(object):
     def __init__(self, serial_obj):
+        self.SEND_DELAY = 0.5
         self.connected = False
         self.settings = Settings()
         self.ser = serial_obj
+        self.progress = True
 
     def send_file(self, file_path):
         if not self.ser.is_open:
@@ -28,11 +32,15 @@ class FileSender(object):
             data_size = len(file_data)
             #print "File size:", data_size, "bytes"
             #for my_byte in tqdm(cobs_encoded, total=data_size, unit='bytes'):
+            if not self.progress:
+                print "Disabling progress meter."
+                tqdm.disable = True
             for my_byte in tqdm(file_data, total=data_size, unit='bytes'):
                 self.ser.write(my_byte)
                 self.ser.write('\n')
-                sleep(0.1)
+                sleep(self.SEND_DELAY)
             #eg.msgbox(msg='File sent', title='Data Sent', ok_button='(OK)')
+            print
 
     def receive_file(self, file_path):
         if not self.ser.is_open:
