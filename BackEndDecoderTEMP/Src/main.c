@@ -41,7 +41,7 @@
 
 /* USER CODE BEGIN Includes */
 //#include "extern_declare.h"
-#define ZEROPULSE 3777
+#define ZEROPULSE 3400
 #define SAMPLE_DELAY 2550
 #define EIGHT_TWO_MSDELAY 8200
 #define INPUT_RISE 'R'
@@ -788,14 +788,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance == TIM5){
 
-		if(OverSampleCounter < 16){ //change this in accordance with conditional statement below
+		if(OverSampleCounter < 15){ //change this in accordance with conditional statement below
 			OverSampleCounter++;
 		}else{
 			SymbolCounter++;
 			OverSampleCounter = 0;
 		}
 		
-		if(OverSampleCounter == 15){	//CHANGE THIS TO CHANGE SAMPLING LOCATION
+		if(OverSampleCounter == 14){	//CHANGE THIS TO CHANGE SAMPLING LOCATION
 			
 			// What does this do?
 			HAL_GPIO_TogglePin(DebugOutput_GPIO_Port, DebugOutput_Pin);

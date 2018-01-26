@@ -7,6 +7,7 @@ import tkFont
 from serial_setup import SuperSerial
 
 from settings import Settings
+
 my_set = Settings()
 
 temperature = my_set.init_temp
@@ -30,9 +31,8 @@ class Looping(object):
         self.temperature = None
         self.alpha = 0.5
 
-
     def isConnected(self):
-        return self.ser.is_open()
+        return self.s.is_open()
 
     @staticmethod
     def button_start():
@@ -46,18 +46,28 @@ class Looping(object):
         return ma_temp
 
     def convert_temp(self, temperature_int):
-        print "temp_int", temperature_int
+        #print "temp_int", temperature_int
         temp_c = (3.3 * temperature_int / 255.0) / 0.01
-        print temp_c
+        #print temp_c
         return temp_c
 
     def get_temperature(self):
         global temperature
         while self.isConnected:
-            temperature = self.ser.readline()
+            if not self.s.is_open:
+                self.s.open()
+            while True:
+                temp = self.s.read()
+                print temp.strip()
+                temperature += temp
+            exit()
+            print "-->%s<--" % temperature.strip()
+            # for num, char in enumerate(temperature):
+            #     print "Serial Input (%d): %s, %d --length: %d" % (num, char, ord(char), len(temperature))
+            self.s.close()
             try:
                 temperature = int(temperature.strip())
-                temperature = self.convert_temp(temperature)
+                #temperature = self.convert_temp(temperature)
 
                 # Added this to intialize the average temperature close to the value its reporting so that it will
                 # take less time to stablilize.

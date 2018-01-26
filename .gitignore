@@ -3,3 +3,11 @@
 .idea/*
 .idea
 *.pyc
+venv
+venv/*
+*.o
+*.crf
+*.axf
+*.axf
+*.o
+*.crf
