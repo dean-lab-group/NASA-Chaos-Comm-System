@@ -7,22 +7,21 @@ from serial_setup import SuperSerial
 class Frame(object):
     def __init__(self, serial_buffer_obj):
         self.s = serial_buffer_obj
-        self.FRAME_END = '0\n0\n'
-        self.DATA_DELIM = '\n0\n'
+        self.FRAME_END = '\0\0'
+        self.DATA_DELIM = '\0'
         # The data in the frame starts at 0 but ends at the next to last entry in the array. So -1 will specifies that.
         self.DATA_BEGIN = 0
         self.DATA_END = -1
         # Frame Info:
-        # self.buff_size = 17
-        # Regex: '\d+\n0\n\d+\n0\n\d+\n0\n0\n'
-        # Sample Data: '18\n0\n18\n0\n18\n0\n0\n'
+        # Regex: '\d+\0\d+\0\d+0\\0\0'
+        # Sample Data: '18\0\18\018\0\0'
 
     def _decode_frame(self):
         buf = self.s.read_until(self.FRAME_END)
         frame = buf.split(self.DATA_DELIM)[self.DATA_BEGIN:self.DATA_END]
-        frame = [x.strip() for x in frame]
+        #frame = [x.strip() for x in frame] # Strips newlines
         # We should only receive three elements in each received array. More than three indicates corrupt data.
-        if len(frame) == 3:
+        if len(frame) == 4:
             # We remove duplicates from the array of three. If all three are not the same, the data is corrupt.
             if len(list(OrderedDict.fromkeys(frame))) == 1:
                 return frame[0]
