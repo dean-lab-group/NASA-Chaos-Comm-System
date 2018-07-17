@@ -4,14 +4,11 @@ import Tkinter
 from Tkinter import Tk, BOTH, Label
 import threading
 import tkFont
-
 from serial_setup import SuperSerial
 from parse_frame import Frame
 from settings import Settings
-from collections import OrderedDict
 
 my_set = Settings()
-
 temperature = my_set.init_temp
 
 top = Tk()
@@ -19,6 +16,9 @@ top.geometry(my_set.window_geometry)
 top.title(my_set.window_title)
 myLabel = Label(top, text=temperature)
 myLabel.pack()
+
+global_counter = 0
+success = 0
 
 
 class Looping(object):
@@ -60,14 +60,19 @@ class Looping(object):
 
     def _get_temperature(self):
         global temperature
+        global global_counter
+        global success
+        global_counter += 1
         if not self.s.is_open:
             self.s.open()
-        temperature = list(OrderedDict.fromkeys(self.frame.frame_data_array))
-        if len(temperature) != 1:
-            print "Received data corrupt"
-            self.s.close()
         try:
-            temperature = int(temperature[0])
+            temperature = self.frame.frame_data_array
+        except Exception:
+            return None
+        print "Received data:", repr(temperature)
+        self.s.close()
+        try:
+            temperature = int(temperature)
             temperature = self._convert_temp(temperature)
 
             # Added this to initialize the average temperature close to the value its reporting so that it will
@@ -78,9 +83,12 @@ class Looping(object):
             self.temperature = temperature
 
             myLabel.config(text="%0.2f deg C" % temperature)
+            success += 1
+            print "(%0.2f%%) %0.2f deg C" % (100*success/float(global_counter), temperature)
         except ValueError as e:
-            pass
-            # print ">>"+temperature+"<<", e
+            print ">>" + temperature + "<<", e
+        except Exception as e:
+            print e
 
     def button_stop(self):
         self.stop_threads.set()
@@ -91,4 +99,5 @@ class Looping(object):
 
 
 l = Looping()
+l.button_start()
 top.mainloop()

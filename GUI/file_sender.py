@@ -95,7 +95,7 @@ if __name__ == '__main__':
         fs = FileSender(receiver)
         fs.receive_file(filename)
     elif mode == '--send':
-        sender = SuperSerial(port='COM5')  # port='/dev/tty.usbmodem1413')
+        sender = SuperSerial()  # port='/dev/tty.usbmodem1413')
         fs = FileSender(sender)
         fs.send_file(filename)
     else:

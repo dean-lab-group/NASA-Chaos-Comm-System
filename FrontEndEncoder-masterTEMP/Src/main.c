@@ -64,6 +64,7 @@ int NextSymbol = 85, CurrentSymbol = 85;
 uint8_t ADC_data[1]; //for reading temp sensor
 int ConvCplt = 0; //this is used to begin transmit function after ADC takes a reading
 uint8_t ConvData[1];
+uint8_t buffer1[100];
 	
 
 volatile int togglecheck = 1; // flag for when to update nextt transmitted symbol
@@ -170,6 +171,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+		//HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
@@ -639,8 +641,10 @@ void ReadCustomData(void)
 	//			//p++;
 	//		}
 					
+		for(int k=0;k<7;k++)
+				{
 			//these two for loops create the start sequence of 1-1-0-0
-				for(int z = 0; z<2; z++)
+				for(int z = 0; z<1; z++) //changed to z<1 for try of 1-0
 				{
 					for(int j=0;j<ONES_REPEATED;j++)
 							{ //Flag a start to the sequence
@@ -651,9 +655,9 @@ void ReadCustomData(void)
 							}
 					//HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);
 				}
-				for(int z = 0; z<2; z++)
+				for(int z = 0; z<1; z++)
 				{
-					for(int j=0;j<ZEROES_REPEATED;j++)
+					for(int j=0;j<ZEROES_REPEATED;j++) //changed to z<1 for 1-0
 					{ //Flag a start to the sequence
 								while(!togglecheck){}
 								HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_RESET);	
@@ -662,20 +666,44 @@ void ReadCustomData(void)
 					}
 					//HAL_GPIO_WritePin(TransistorSwitch_GPIO_Port, TransistorSwitch_Pin, GPIO_PIN_SET);
 				 }				
-	//this loop takes the 8 values in sendbuff and makes them into the bitstream to be sent			
+	//this loop takes the 8 values in sendbuff and makes them into the bitstream to be sent	
+if (k%2 == 0 && k<5)
+{	
 		for(i=0;i<8;i++)
 		{
-			if(sendbuff[i] == 1)
+			if(sendbuff[i] == 1) //1 = 1-0
 				{
-				ManchesterOne();
+				ManchesterOne();	
+				ManchesterZero();
+				if(k>4)
+				{
 				sendbuff[i] = 0;
 				}
-				else if(sendbuff[i] == 0)
+				}
+				else if(sendbuff[i] == 0) //0 = 1-1-0
 				{
+				ManchesterOne();
+				ManchesterOne();
 				ManchesterZero();
-				sendbuff[i] = 0;			
+				if(k>4)
+				{
+				sendbuff[i] = 0;	
+				}					
 				}
 		}
+	}
+else //null delimiter thing
+{
+	for(i=0;i<8;i++)
+	{
+		ManchesterOne();
+		ManchesterOne();
+		ManchesterZero();
+		//ManchesterZero();
+	}
+}
+HAL_Delay(10);
+	}
 		ConvCplt = 0;
 	}
 		while(!togglecheck){ //set back to low
@@ -691,8 +719,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc1) //reads temperature sens
 		ADC_data[0] = HAL_ADC_GetValue(hadc1);
 		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin); //shows conversion happening every 2 seconds
 		static int p1=0;
-		uint8_t buffer1[100];
-		p1 = sprintf((char *)buffer1, "%d\n",ADC_data[0]); // remember sprintf returns a length
+		p1 = sprintf((char *)buffer1, "%d\n0\n%d\n0\n%d\n0\n0\n",ADC_data[0],ADC_data[0],ADC_data[0]); // remember sprintf returns a length
 		HAL_UART_Transmit(&huart2, buffer1, p1,50); //transmit data in buffer1 with length p1
 		ConvCplt = 1;
 }

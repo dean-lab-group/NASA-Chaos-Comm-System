@@ -41,7 +41,7 @@
 
 /* USER CODE BEGIN Includes */
 //#include "extern_declare.h"
-#define ZEROPULSE 3400
+#define ZEROPULSE 3700 //change this to change the threshold for 1 and 0 pulse length
 #define SAMPLE_DELAY 2550
 #define EIGHT_TWO_MSDELAY 8200
 #define INPUT_RISE 'R'
@@ -106,8 +106,11 @@ uint32_t SymbolReceived;
 uint32_t SequenceFlags;
 uint32_t SequenceIndex;
 uint32_t StartFlag = 0;
-uint8_t SerialSequenceReceived[8];
-uint32_t SerialIndex = 8;
+uint8_t SerialSequenceReceived[8]; //changed to 16 to accept Manchester data
+uint32_t SerialIndex = 8; //changed to 16 to accept the Manchester data
+int start = 0; //used with new encoding scheme (1-0 and 1-1-0) 
+int databegin = 0; //to make sure the pulse measurement takes place on the rising edge of the first data sequence
+int arrayPos = 8; //used to store data bits in array
 
 
 /* USER CODE END PV */
@@ -711,9 +714,12 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
-	if(htim->Instance == TIM4){ 
-		switch(EdgeFlag){
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+	{
+	if(htim->Instance == TIM4)
+		{ 
+		switch(EdgeFlag)
+			{
 			case INPUT_RISE:
 				RiseTimestamp = __HAL_TIM_GET_COMPARE(&htim4, TIM_CHANNEL_1);
 				TIM_RESET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1);
@@ -725,28 +731,155 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 				TIM_SET_CAPTUREPOLARITY(&htim4, TIM_CHANNEL_1, TIM_ICPOLARITY_RISING);
 				FilteredSignal = PulseSymbolValidation(RiseTimestamp, FallTimestamp);
 				//if(SerialModeFlag == 0){
-					switch(FilteredSignal){
+					switch(FilteredSignal)
+						{
 						case 0:
-							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
-							ZeroCounter++;
-							if(OnesCounter <= 13){ 
-								OnesCounter= 0;
-							}else if((OnesCounter > 14) && (ZeroCounter > 12)){ //counts up how many ONE pulses from matched filter and ZERO pulses after to determine start sequence
-								if((htim5.Instance->CR1 && TIM_CR1_CEN) == 0){
-										HAL_TIM_Base_Start_IT(&htim5);
-										//RUNONCEFLAG++;
-										OnesCounter = 0;
-										ZeroCounter = 0;
-								}
-							}
-							break;
-						case 1:
-							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
-							OnesCounter++;
+						if (ZeroCounter > 40) //weirdness, just reset everything
+						{
+							start = 0;
 							ZeroCounter = 0;
-							break;
+							OnesCounter = 0;
+							arrayPos = 8;
+						}
+						if (start == 0)
+						{
+							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+						}
+						else
+						{
+							//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+						}
+//							if (OnesCounter != 0)
+//							{
+//							HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+//							}
+//							if (start == 0)
+//							{
+//							//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+//							}
+//							ZeroCounter++;
+				if((OnesCounter <= 16) && (start == 0)) //this is a case where some noise might have gotten through
+				{ 
+						OnesCounter= 0;
+////								//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET); //show normal/test zero
+				}
+				if((OnesCounter > 10) && (ZeroCounter > 4) && (start == 0)) //this is when the ones and zeros are both high enough to signify the start sequence
+				{ 																									//counts up how many ONE pulses from matched filter and ZERO pulses after to determine start sequence
+//								//if((htim5.Instance->CR1 && TIM_CR1_CEN) == 0)																								//altered to accept 1-0 start sequence
+//										//HAL_TIM_Base_Start_IT(&htim5);
+//										//RUNONCEFLAG++;
+										start = 1;
+										OnesCounter = 0; //keep the Ones count of the start sequence from messing with the first data bit
+//										OnesCounter = 0;
+//										ZeroCounter = 0;
+//										//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+				}
+//							else if ((start == 1) && (databegin == 1)) //if data is being received -- this should be entered when the first return to zero happens.
+//							{
+//								if (arrayPos > 0) //data value received is between 1 and 8
+//								{
+	if (ZeroCounter == 0 && start == 1)
+	{
+				
+				if (start == 1 && arrayPos > 1)
+				{
+								//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+								if (OnesCounter > 26)
+								{
+									HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET); //received 1-1-0, go low
+									//SerialSequenceReceived[arrayPos - 1] = 0;
+								}
+								else
+								{
+									HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET); //received 1-0, go high
+									//SerialSequenceReceived[arrayPos - 1] = 1;
+								}
+						OnesCounter = 0;
+						ZeroCounter++;
+						arrayPos--;
 					}
-				//}
+					else if (start == 1 && arrayPos == 1)
+					{
+						if (OnesCounter > 24)
+								{
+									//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET); //received 1-1-0, go low
+									//SerialSequenceReceived[arrayPos - 1] = 0;
+								}
+								else
+								{
+									//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET); //received 1-0, go high
+									//SerialSequenceReceived[arrayPos - 1] = 1;
+								}
+						arrayPos = 8;
+						start = 0;
+						OnesCounter = 0;
+						ZeroCounter++;
+					}
+					else if (start == 0)
+					{
+						//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+						ZeroCounter++;
+					}
+					else
+					{
+						ZeroCounter++;
+					}
+	}
+	else
+	{
+		ZeroCounter++;
+	}
+	
+//								OnesCounter = 0;
+//								ZeroCounter = 0;
+//								arrayPos--; //prepare for next data bit
+//								}
+//								else //end of 8 bits of data
+//								{
+//									OutputSymbol(); //finished receiving 8 bits, output the data
+//									databegin = 0; //reset begin and start to wait for start sequence again
+//									start = 0;
+//									arrayPos = 8; //reset array position to be ready for next set of data
+//									OnesCounter = 0;
+//									ZeroCounter = 0;
+//									//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+//								}
+//							}
+							break;
+	
+	
+						case 1:
+							if (OnesCounter > 12 && start == 1)
+							{
+							//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_SET);
+							}
+							else
+							{
+							//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET);
+							}
+
+//							if (start == 1 && databegin == 0) //this should be the first "1" after the start sequence is verified
+//							{
+//								databegin = 1; //show that data is starting to be received
+//								OnesCounter = 0;	//reset to make sure of an accurate count
+//								ZeroCounter = 0;
+//							}
+//							else
+//							{
+//							if (start == 0)
+//							{
+//								//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET); //show the high of the start sequence or a test case
+//							}
+//							else
+//							{
+//								//HAL_GPIO_WritePin(DecodedOutput_GPIO_Port, DecodedOutput_Pin, GPIO_PIN_RESET); //go low when getting a high data pulse
+//							}
+								OnesCounter++;
+								ZeroCounter = 0;
+//							}
+						break;
+//					}
+				}
 				break;
 		}
 	}
@@ -785,44 +918,46 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 }
 
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	if(htim->Instance == TIM5){
+//uncomment the period elapsed callback function if you want to do midpoint sampling
 
-		if(OverSampleCounter < 15){ //change this in accordance with conditional statement below
-			OverSampleCounter++;
-		}else{
-			SymbolCounter++;
-			OverSampleCounter = 0;
-		}
-		
-		if(OverSampleCounter == 14){	//CHANGE THIS TO CHANGE SAMPLING LOCATION
-			
-			// What does this do?
-			HAL_GPIO_TogglePin(DebugOutput_GPIO_Port, DebugOutput_Pin);
+//void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+//	if(htim->Instance == TIM5){
 
-			SerialSequenceReceived[SerialIndex-1] = FilteredSignal;
-			SerialIndex--;
-			if(SerialIndex == 0){ 
-				SerialIndex = 8;
-				StartFlag = 0;
-				OnesCounter = 0;
-				ZeroCounter = 0;
-				SymbolCounter = 0;
-				OverSampleCounter = 0;
-				
-				// What does this do?
-				while(HAL_TIM_Base_Stop_IT(&htim5) != HAL_OK);
-				
-				OutputSymbol();
-				
-				for(int i = 0; i<8; i++){
-					SerialSequenceReceived[i] = 0;
-				}
-				
-			}
-		}
-	}
-}
+//		if(OverSampleCounter < 17){ //change this in accordance with conditional statement below
+//			OverSampleCounter++;
+//		}else{
+//			SymbolCounter++;
+//			OverSampleCounter = 0;
+//		}
+//		
+//		if(OverSampleCounter == 16){	//CHANGE THIS TO CHANGE SAMPLING LOCATION
+//			
+//			// What does this do? Shows output
+//			HAL_GPIO_TogglePin(DebugOutput_GPIO_Port, DebugOutput_Pin);
+
+//			SerialSequenceReceived[SerialIndex-1] = FilteredSignal;
+//			SerialIndex--;
+//			if(SerialIndex == 0){ 
+//				SerialIndex = 8; //changed to 16 for Manchester
+//				StartFlag = 0;
+//				OnesCounter = 0;
+//				ZeroCounter = 0;
+//				SymbolCounter = 0;
+//				OverSampleCounter = 0;
+//				
+//				// What does this do? STOPS the midpoint timer
+//				while(HAL_TIM_Base_Stop_IT(&htim5) != HAL_OK); //stop the midpoint timer after 8 samples
+//				
+//				OutputSymbol();
+//				
+//				for(int i = 0; i<8; i++){ //changed to 16 for manchester
+//					SerialSequenceReceived[i] = 0;
+//				}
+//				
+//			}
+//		}
+//	}
+//}
 
 
 
@@ -889,11 +1024,11 @@ void OutputSymbol (void){
 	for(int i = 0; i<8; i++){
 		compressedsequence += SerialSequenceReceived[i] << (7-i);
 	}
-	if(compressedsequence == 13){	
-		p = sprintf((char *)buffer, "%d\n", compressedsequence);
+	if(compressedsequence == 0){	//if a null received
+		p = sprintf((char *)buffer, "%c", compressedsequence);
 		dbg2 = HAL_UART_Transmit(&huart2, buffer, p,50);
-	}else{
-		p = sprintf((char *)buffer, "%d\n", compressedsequence);
+	}else{ //otherwise it's temperature data
+		p = sprintf((char *)buffer, "%d", compressedsequence);
 		dbg2 = HAL_UART_Transmit(&huart2, buffer, p,50);
 	}
 	
