@@ -23,7 +23,7 @@ class Frame(object):
         # We should only receive three elements in each received array. More than three indicates corrupt data.
         if len(frame) == 4:
             # We remove duplicates from the array of three. If all three are not the same, the data is corrupt.
-            if len(list(OrderedDict.fromkeys(frame))) == 1:
+            if len(set(OrderedDict.fromkeys(frame))) == 2:
                 return frame[0]
             else:
                 print "Inconsistent data", repr(buf), frame
