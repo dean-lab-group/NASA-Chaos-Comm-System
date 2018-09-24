@@ -43,4 +43,4 @@ while True:
     fh.write('\n')
     fh.flush()
     total = total+1
-    time.sleep(1)
+    time.sleep(0.5)
